@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { CalendarEvent } from '../types'
 import { parseIcs, exportToIcs, downloadIcs } from '../utils/ics'
-import { fetchIsraeliHolidays, getUpcomingHolidays } from '../utils/holidays'
+import { fetchIsraeliHolidays } from '../utils/holidays'
 import type { IsraeliHoliday } from '../utils/holidays'
 
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר']
