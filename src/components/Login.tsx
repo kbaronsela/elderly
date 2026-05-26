@@ -10,6 +10,7 @@ export default function Login() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -113,15 +114,25 @@ export default function Login() {
             </div>
             <div>
               <label className="block text-xl font-semibold text-gray-700 mb-2">סיסמה</label>
+              <div className="relative">
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 placeholder="לפחות 6 תווים"
-                className="w-full border-2 border-blue-200 rounded-xl p-4 text-xl focus:border-blue-500 outline-none"
+                className="w-full border-2 border-blue-200 rounded-xl p-4 text-xl focus:border-blue-500 outline-none pl-14"
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 dir="ltr"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-2xl text-gray-500 select-none"
+                tabIndex={-1}
+              >
+                {showPassword ? '🙈' : '👁️'}
+              </button>
+              </div>
             </div>
 
             {error && (
