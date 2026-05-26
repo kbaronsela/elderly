@@ -290,7 +290,8 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ── updateElderlyAvatar ────────────────────────────────────────────────────
   updateElderlyAvatar: async (elderlyId, avatar) => {
-    await supabase.from('profiles').update({ avatar }).eq('id', elderlyId)
+    const { error } = await supabase.from('profiles').update({ avatar }).eq('id', elderlyId)
+    if (error) { console.error('updateElderlyAvatar error:', error.message); return }
     set(s => ({
       allUsers: s.allUsers.map(u => u.id === elderlyId ? { ...u, avatar } : u),
       currentUser: s.currentUser?.id === elderlyId ? { ...s.currentUser, avatar } : s.currentUser,
