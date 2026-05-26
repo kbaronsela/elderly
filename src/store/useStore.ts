@@ -31,7 +31,7 @@ interface AppState {
   login: (username: string, password: string) => Promise<boolean>
   logout: () => Promise<void>
   registerElderly: (name: string, username: string, password: string) => Promise<void>
-  registerFamily: (name: string, username: string, password: string) => Promise<void>
+  registerFamily: (name: string, username: string, password: string, phone?: string) => Promise<void>
   initSession: () => Promise<void>
 
   // Navigation
@@ -99,7 +99,7 @@ async function loadElderlyData(elderlyId: string): Promise<UserData> {
   }
 }
 
-async function buildUserFromProfile(profile: { id: string; username: string; name: string; role: string; wake_up_time: string; avatar?: string }, linkedElderlyIds?: string[], linkedFamilyUserIds?: string[]): Promise<User> {
+async function buildUserFromProfile(profile: { id: string; username: string; name: string; role: string; wake_up_time: string; avatar?: string; phone?: string }, linkedElderlyIds?: string[], linkedFamilyUserIds?: string[]): Promise<User> {
   return {
     id: profile.id,
     username: profile.username,
@@ -107,6 +107,7 @@ async function buildUserFromProfile(profile: { id: string; username: string; nam
     passwordHash: '',
     role: profile.role as 'elderly' | 'family',
     avatar: profile.avatar ?? (profile.role === 'elderly' ? '👴' : '👨‍👩‍👧'),
+    phone: profile.phone ?? '',
     wakeUpTime: profile.wake_up_time,
     googleCalendarConnected: false,
     linkedElderlyIds,
@@ -196,16 +197,16 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   // ── registerFamily ─────────────────────────────────────────────────────────
-  registerFamily: async (name, username, password) => {
+  registerFamily: async (name, username, password, phone?) => {
     set({ loading: true, error: null })
     const email = `${username}@elderlycare.com`
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error || !data.user) { set({ loading: false, error: error?.message ?? 'שגיאה בהרשמה' }); return }
 
     await supabase.from('profiles').insert({
-      id: data.user.id, username, name, role: 'family', wake_up_time: '07:00',
+      id: data.user.id, username, name, role: 'family', wake_up_time: '07:00', phone: phone ?? '',
     })
-    const user = await buildUserFromProfile({ id: data.user.id, username, name, role: 'family', wake_up_time: '07:00' }, [], [])
+    const user = await buildUserFromProfile({ id: data.user.id, username, name, role: 'family', wake_up_time: '07:00', phone: phone ?? '' }, [], [])
     set({ currentUser: user, allUsers: [user], screen: 'family-dashboard', loading: false })
   },
 
@@ -221,7 +222,14 @@ export const useStore = create<AppState>((set, get) => ({
     await supabase.from('profiles').update({
       name: updated.name,
       wake_up_time: updated.wakeUpTime,
+      phone: updated.phone,
     }).eq('id', currentUser.id)
+    // If family member updated their phone, sync it to all elderly contacts
+    if (currentUser.role === 'family' && updates.phone !== undefined) {
+      await supabase.from('family_members')
+        .update({ phone: updates.phone })
+        .eq('email', currentUser.username)
+    }
     set({ currentUser: updated })
   },
 
@@ -242,16 +250,21 @@ export const useStore = create<AppState>((set, get) => ({
 
     // Auto-add family member as a contact for the elderly user (if not already there)
     const existingContact = await supabase.from('family_members')
-      .select('id').eq('elderly_user_id', profile.id).eq('name', currentUser.name).maybeSingle()
+      .select('id').eq('elderly_user_id', profile.id).eq('email', currentUser.username).maybeSingle()
     if (!existingContact.data) {
       await supabase.from('family_members').insert({
         id: uid(),
         elderly_user_id: profile.id,
         name: currentUser.name,
         relation: 'בן/בת משפחה',
-        phone: '',
+        phone: currentUser.phone ?? '',
         email: currentUser.username,
       })
+    } else if (currentUser.phone) {
+      // Update phone if we have it
+      await supabase.from('family_members')
+        .update({ phone: currentUser.phone })
+        .eq('id', existingContact.data.id)
     }
 
     // Load elderly data

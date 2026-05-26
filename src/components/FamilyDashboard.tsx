@@ -4,11 +4,20 @@ import { formatDateHe } from '../utils/dateHe'
 import type { User } from '../types'
 
 export default function FamilyDashboard() {
-  const { currentUser, getLinkedElderlyUsers, getElderlyData, linkToElderly, setScreen, setViewingElderlyId, logout } = useStore()
+  const { currentUser, getLinkedElderlyUsers, getElderlyData, linkToElderly, updateUser, setScreen, setViewingElderlyId, logout } = useStore()
   const [linkUsername, setLinkUsername] = useState('')
   const [linkError, setLinkError] = useState('')
   const [linkSuccess, setLinkSuccess] = useState('')
   const [showLinkForm, setShowLinkForm] = useState(false)
+  const [showPhoneEdit, setShowPhoneEdit] = useState(false)
+  const [phoneInput, setPhoneInput] = useState(currentUser?.phone ?? '')
+  const [phoneSaved, setPhoneSaved] = useState(false)
+
+  async function savePhone() {
+    await updateUser({ phone: phoneInput.trim() })
+    setPhoneSaved(true)
+    setTimeout(() => { setPhoneSaved(false); setShowPhoneEdit(false) }, 1500)
+  }
 
   if (!currentUser || currentUser.role !== 'family') return null
   const linkedElderly = getLinkedElderlyUsers()
@@ -39,13 +48,41 @@ export default function FamilyDashboard() {
     <div className="min-h-screen bg-gradient-to-b from-green-50 to-emerald-50 p-4 pb-24">
       {/* Header */}
       <div className="bg-white rounded-3xl shadow-lg p-6 mb-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <p className="text-2xl font-black text-green-700">שלום, {currentUser.name}! 👋</p>
             <p className="text-lg text-gray-500">{formatDateHe(now)}</p>
           </div>
           <button onClick={logout} className="text-gray-400 text-sm font-bold px-3 py-2 hover:text-red-500">יציאה</button>
         </div>
+
+        {/* Phone section */}
+        {!showPhoneEdit ? (
+          <button
+            onClick={() => { setPhoneInput(currentUser.phone ?? ''); setShowPhoneEdit(true) }}
+            className="flex items-center gap-2 text-base text-gray-500 hover:text-green-700 transition-colors"
+          >
+            <span>📱</span>
+            <span>{currentUser.phone ? currentUser.phone : 'הוסף מספר טלפון לעדכוני וואטסאפ'}</span>
+            <span className="text-green-600 font-bold text-sm">{currentUser.phone ? '✏️ ערוך' : '➕ הוסף'}</span>
+          </button>
+        ) : (
+          <div className="flex gap-2 items-center mt-1">
+            <input
+              type="tel"
+              value={phoneInput}
+              onChange={e => setPhoneInput(e.target.value)}
+              placeholder="050-0000000"
+              className="flex-1 border-2 border-green-300 rounded-xl p-2 text-lg focus:border-green-500 outline-none"
+              dir="ltr"
+              autoFocus
+            />
+            <button onClick={savePhone} className="bg-green-600 text-white font-bold px-4 py-2 rounded-xl text-lg hover:bg-green-700">
+              {phoneSaved ? '✅' : 'שמור'}
+            </button>
+            <button onClick={() => setShowPhoneEdit(false)} className="text-gray-400 text-2xl px-1">✕</button>
+          </div>
+        )}
       </div>
 
       {/* Link to elderly */}

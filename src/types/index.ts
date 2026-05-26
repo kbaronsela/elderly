@@ -7,6 +7,7 @@ export interface User {
   passwordHash: string
   role: UserRole
   avatar?: string
+  phone?: string
   // Elderly only
   wakeUpTime?: string // "HH:MM"
   googleCalendarConnected?: boolean

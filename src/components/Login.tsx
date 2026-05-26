@@ -9,6 +9,7 @@ export default function Login() {
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [phone, setPhone] = useState('')
   const [error, setError] = useState('')
   const [showPassword, setShowPassword] = useState(false)
 
@@ -33,7 +34,7 @@ export default function Login() {
       setError('שם משתמש: אותיות אנגלית קטנות, מספרים וקו תחתון בלבד'); return
     }
     if (mode === 'register-elderly') await registerElderly(name.trim(), username.trim(), password)
-    else await registerFamily(name.trim(), username.trim(), password)
+    else await registerFamily(name.trim(), username.trim(), password, phone.trim() || undefined)
     if (storeError) setError(storeError)
   }
 
@@ -95,6 +96,22 @@ export default function Login() {
                   placeholder="למשל: שרה כהן"
                   className="w-full border-2 border-blue-200 rounded-xl p-4 text-xl focus:border-blue-500 outline-none"
                 />
+              </div>
+            )}
+            {mode === 'register-family' && (
+              <div>
+                <label className="block text-xl font-semibold text-gray-700 mb-2">
+                  מספר טלפון <span className="text-gray-400 font-normal text-lg">(אופציונלי)</span>
+                </label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={e => setPhone(e.target.value)}
+                  placeholder="050-0000000"
+                  className="w-full border-2 border-green-200 rounded-xl p-4 text-xl focus:border-green-500 outline-none"
+                  dir="ltr"
+                />
+                <p className="text-sm text-gray-400 mt-1">לקבלת עדכוני וואטסאפ על תרופות</p>
               </div>
             )}
             <div>
