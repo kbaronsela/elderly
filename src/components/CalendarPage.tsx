@@ -139,18 +139,23 @@ export default function CalendarPage() {
       {israeliHolidays.length > 0 && (
         <div className="bg-white rounded-3xl shadow p-5 mb-5">
           <h2 className="text-xl font-bold text-indigo-700 mb-3">🇮🇱 חגים ישראליים – {new Date().getFullYear()}</h2>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {getUpcomingHolidays(israeliHolidays, 365).map(h => {
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {[...israeliHolidays]
+              .filter(h => h.date.startsWith(String(new Date().getFullYear())))
+              .sort((a, b) => a.date.localeCompare(b.date))
+              .map(h => {
               const d = new Date(h.date + 'T12:00:00')
-              const isToday = h.date === new Date().toISOString().slice(0, 10)
+              const todayStr = new Date().toISOString().slice(0, 10)
+              const isToday = h.date === todayStr
+              const isPast = h.date < todayStr
               return (
-                <div key={h.date + h.title} className={`flex items-center justify-between rounded-2xl px-4 py-2 ${isToday ? 'bg-blue-100 font-bold' : 'bg-gray-50'}`}>
+                <div key={h.date + h.title} className={`flex items-center justify-between rounded-2xl px-4 py-2 ${isToday ? 'bg-blue-100 ring-2 ring-blue-400' : isPast ? 'opacity-40 bg-gray-50' : 'bg-gray-50'}`}>
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🇮🇱</span>
-                    <span className="text-lg text-gray-800">{h.hebrew}</span>
+                    <span className={`text-lg ${isToday ? 'font-black text-blue-800' : 'text-gray-800'}`}>{h.hebrew}</span>
                     {isToday && <span className="text-blue-600 text-sm font-bold">היום!</span>}
                   </div>
-                  <span className="text-base text-gray-500 dir-ltr">
+                  <span className="text-base text-gray-500">
                     {d.getDate()}/{d.getMonth() + 1}
                   </span>
                 </div>
