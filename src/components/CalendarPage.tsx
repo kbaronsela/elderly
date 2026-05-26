@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { CalendarEvent } from '../types'
+import { parseIcs, exportToIcs, downloadIcs } from '../utils/ics'
 
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר']
 
@@ -12,7 +13,9 @@ export default function CalendarPage() {
   const { currentUser, getElderlyData, addCalendarEvent, setCalendarEvents, setScreen } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<Omit<CalendarEvent, 'id'>>(emptyEvent)
-  const [gcalNote, setGcalNote] = useState(false)
+  const [importMsg, setImportMsg] = useState('')
+  const [showSyncHelp, setShowSyncHelp] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   if (!currentUser || currentUser.role !== 'elderly') return null
   const { calendarEvents } = getElderlyData(currentUser.id)
@@ -41,6 +44,30 @@ export default function CalendarPage() {
     setForm(emptyEvent)
   }
 
+  function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      const parsed = parseIcs(text)
+      if (parsed.length === 0) {
+        setImportMsg('⚠️ לא נמצאו אירועים בקובץ')
+      } else {
+        parsed.forEach(ev => addCalendarEvent(ev))
+        setImportMsg(`✅ יובאו ${parsed.length} אירועים`)
+      }
+      setTimeout(() => setImportMsg(''), 3000)
+    }
+    reader.readAsText(file, 'UTF-8')
+    e.target.value = ''
+  }
+
+  function handleExport() {
+    const ics = exportToIcs(calendarEvents)
+    downloadIcs(ics, 'my-calendar.ics')
+  }
+
   return (
     <div className="min-h-screen bg-yellow-50 p-4 pb-28">
       <div className="flex items-center mb-6">
@@ -48,24 +75,51 @@ export default function CalendarPage() {
         <h1 className="text-3xl font-black text-yellow-800 mr-2">📅 לוח שנה</h1>
       </div>
 
+      {/* Sync section */}
       <div className="bg-white rounded-3xl shadow p-5 mb-5">
-        <h2 className="text-xl font-bold text-gray-700 mb-3">🔗 חיבור לגוגל קלנדר</h2>
-        {gcalNote ? (
-          <div className="bg-blue-50 rounded-2xl p-4 text-lg text-blue-800">
-            <p className="font-bold mb-1">איך מחברים:</p>
-            <ol className="list-decimal list-inside space-y-1">
-              <li>פתח Google Calendar במחשב</li>
-              <li>ייצא אירועים חשובים לפורמט ICS</li>
-              <li>הוסף ידנית אירועים חשובים כאן למטה</li>
-            </ol>
-            <p className="mt-3 text-gray-500 text-base">חיבור מלא דורש שרת – כרגע ניתן להוסיף ידנית.</p>
-            <button onClick={() => setGcalNote(false)} className="mt-3 text-blue-600 font-bold">סגור</button>
-          </div>
-        ) : (
-          <button onClick={() => setGcalNote(true)}
-            className="w-full bg-blue-600 text-white font-bold text-xl py-4 rounded-2xl hover:bg-blue-700 active:scale-95 transition-all">
-            📲 חיבור לגוגל קלנדר
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-700">🔗 סנכרון לוח שנה</h2>
+          <button onClick={() => setShowSyncHelp(v => !v)} className="text-blue-500 text-sm font-bold">
+            {showSyncHelp ? 'סגור ✕' : 'איך? ❓'}
           </button>
+        </div>
+
+        {showSyncHelp && (
+          <div className="bg-blue-50 rounded-2xl p-4 text-base text-blue-800 mb-4">
+            <p className="font-bold mb-2">📥 יבוא מגוגל קלנדר:</p>
+            <ol className="list-decimal list-inside space-y-1 mb-3">
+              <li>פתח <strong>Google Calendar</strong> במחשב</li>
+              <li>הגדרות ← לחץ על שם הלוח ← "ייצא לוח שנה"</li>
+              <li>תקבל קובץ <strong>.ics</strong> – הכנס אותו כאן</li>
+            </ol>
+            <p className="font-bold mb-2">📤 ייצוא לגוגל קלנדר:</p>
+            <ol className="list-decimal list-inside space-y-1">
+              <li>לחץ "ייצוא" למטה לקבלת קובץ .ics</li>
+              <li>ב-Google Calendar: הגדרות ← "ייבוא"</li>
+            </ol>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="flex-1 bg-blue-600 text-white font-bold text-lg py-3 rounded-2xl hover:bg-blue-700 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            📥 יבוא .ics
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={calendarEvents.length === 0}
+            className="flex-1 bg-green-600 text-white font-bold text-lg py-3 rounded-2xl hover:bg-green-700 active:scale-95 transition-all disabled:opacity-40 flex items-center justify-center gap-2"
+          >
+            📤 ייצוא .ics
+          </button>
+        </div>
+
+        <input ref={fileRef} type="file" accept=".ics" className="hidden" onChange={handleImport} />
+
+        {importMsg && (
+          <p className="text-center text-lg font-bold mt-3 text-green-700">{importMsg}</p>
         )}
       </div>
 
