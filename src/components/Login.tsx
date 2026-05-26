@@ -111,7 +111,7 @@ export default function Login() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="לפחות 4 תווים"
+                placeholder="לפחות 6 תווים"
                 className="w-full border-2 border-blue-200 rounded-xl p-4 text-xl focus:border-blue-500 outline-none"
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 dir="ltr"
