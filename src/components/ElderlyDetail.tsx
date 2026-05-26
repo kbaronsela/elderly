@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { DAYS_HE, MONTHS_HE } from '../utils/dateHe'
+import AvatarPicker from './AvatarPicker'
 
 const TABS = ['תרופות', 'היסטוריה', 'יומן'] as const
 type Tab = typeof TABS[number]
 
 export default function ElderlyDetail() {
-  const { viewingElderlyId, allUsers, getElderlyData, setScreen, setViewingElderlyId } = useStore()
+  const { viewingElderlyId, allUsers, getElderlyData, setScreen, setViewingElderlyId, updateElderlyAvatar } = useStore()
   const [tab, setTab] = useState<Tab>('תרופות')
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
   const elderly = allUsers.find(u => u.id === viewingElderlyId)
   if (!elderly) return null
@@ -168,12 +170,29 @@ export default function ElderlyDetail() {
       <div className="bg-white rounded-3xl shadow-lg p-5 mb-5">
         <div className="flex items-center gap-4 mb-3">
           <button onClick={back} className="text-3xl p-1 text-gray-500">→</button>
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-4xl flex-shrink-0">👴</div>
+          <div className="relative flex-shrink-0">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-4xl">
+              {elderly.avatar ?? '👴'}
+            </div>
+            <button
+              onClick={() => setShowAvatarPicker(true)}
+              className="absolute -bottom-1 -right-1 bg-white border-2 border-blue-200 rounded-full w-7 h-7 flex items-center justify-center text-sm shadow hover:bg-blue-50 active:scale-95"
+              title="שנה תמונה"
+            >✏️</button>
+          </div>
           <div>
             <h1 className="text-3xl font-black text-gray-800">{elderly.name}</h1>
             <p className="text-lg text-gray-400">מעקב תרופות ויומן</p>
           </div>
         </div>
+
+        {showAvatarPicker && (
+          <AvatarPicker
+            current={elderly.avatar ?? '👴'}
+            onSelect={avatar => updateElderlyAvatar(elderly.id, avatar)}
+            onClose={() => setShowAvatarPicker(false)}
+          />
+        )}
 
         {/* Quick stats */}
         <div className="grid grid-cols-3 gap-3">

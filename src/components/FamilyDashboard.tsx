@@ -13,11 +13,11 @@ export default function FamilyDashboard() {
   if (!currentUser || currentUser.role !== 'family') return null
   const linkedElderly = getLinkedElderlyUsers()
 
-  function handleLink() {
+  async function handleLink() {
     setLinkError('')
     setLinkSuccess('')
     if (!linkUsername.trim()) { setLinkError('הכנס שם משתמש'); return }
-    const ok = linkToElderly(linkUsername.trim())
+    const ok = await linkToElderly(linkUsername.trim())
     if (!ok) {
       setLinkError('לא נמצא משתמש קשיש עם שם זה')
     } else {
@@ -85,8 +85,8 @@ export default function FamilyDashboard() {
       </h2>
 
       {linkedElderly.length === 0 && (
-        <div className="text-center text-xl text-gray-400 py-12">
-          <div className="text-7xl mb-4">👴</div>
+      <div className="text-center text-xl text-gray-400 py-12">
+        <div className="text-7xl mb-4">👴👵</div>
           <p>לחץ "הוסף" כדי להתחבר לקרוב משפחה</p>
         </div>
       )}
@@ -120,7 +120,7 @@ export default function FamilyDashboard() {
               {/* Name & status badge */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-3xl">👴</div>
+                  <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center text-3xl">{elderly.avatar ?? '👴'}</div>
                   <div>
                     <h3 className="text-2xl font-black text-gray-800">{elderly.name}</h3>
                     <p className="text-base text-gray-400">לחץ לפרטים מלאים</p>

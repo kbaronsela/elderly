@@ -44,6 +44,7 @@ interface AppState {
   // Linking
   linkToElderly: (elderlyUsername: string) => Promise<boolean>
   unlinkFamilyUser: (familyUserId: string) => Promise<void>
+  updateElderlyAvatar: (elderlyId: string, avatar: string) => Promise<void>
 
   // Medications
   addMedication: (med: Omit<Medication, 'id'>) => Promise<void>
@@ -98,13 +99,14 @@ async function loadElderlyData(elderlyId: string): Promise<UserData> {
   }
 }
 
-async function buildUserFromProfile(profile: { id: string; username: string; name: string; role: string; wake_up_time: string }, linkedElderlyIds?: string[], linkedFamilyUserIds?: string[]): Promise<User> {
+async function buildUserFromProfile(profile: { id: string; username: string; name: string; role: string; wake_up_time: string; avatar?: string }, linkedElderlyIds?: string[], linkedFamilyUserIds?: string[]): Promise<User> {
   return {
     id: profile.id,
     username: profile.username,
     name: profile.name,
     passwordHash: '',
     role: profile.role as 'elderly' | 'family',
+    avatar: profile.avatar ?? (profile.role === 'elderly' ? '👴' : '👨‍👩‍👧'),
     wakeUpTime: profile.wake_up_time,
     googleCalendarConnected: false,
     linkedElderlyIds,
@@ -236,7 +238,21 @@ export const useStore = create<AppState>((set, get) => ({
       family_user_id: currentUser.id,
       elderly_user_id: profile.id,
     })
-    if (error && error.code !== '23505') return false // 23505 = duplicate key (already linked)
+    if (error && error.code !== '23505') return false
+
+    // Auto-add family member as a contact for the elderly user (if not already there)
+    const existingContact = await supabase.from('family_members')
+      .select('id').eq('elderly_user_id', profile.id).eq('name', currentUser.name).maybeSingle()
+    if (!existingContact.data) {
+      await supabase.from('family_members').insert({
+        id: uid(),
+        elderly_user_id: profile.id,
+        name: currentUser.name,
+        relation: 'בן/בת משפחה',
+        phone: '',
+        email: currentUser.username,
+      })
+    }
 
     // Load elderly data
     const elderlyUser = await buildUserFromProfile(profile)
@@ -249,6 +265,15 @@ export const useStore = create<AppState>((set, get) => ({
       userData: { ...s.userData, [profile.id]: data },
     }))
     return true
+  },
+
+  // ── updateElderlyAvatar ────────────────────────────────────────────────────
+  updateElderlyAvatar: async (elderlyId, avatar) => {
+    await supabase.from('profiles').update({ avatar }).eq('id', elderlyId)
+    set(s => ({
+      allUsers: s.allUsers.map(u => u.id === elderlyId ? { ...u, avatar } : u),
+      currentUser: s.currentUser?.id === elderlyId ? { ...s.currentUser, avatar } : s.currentUser,
+    }))
   },
 
   // ── unlinkFamilyUser ───────────────────────────────────────────────────────
