@@ -309,8 +309,10 @@ export const useStore = create<AppState>((set, get) => ({
 
   // ── refreshLinkedFamilyUsers ───────────────────────────────────────────────
   refreshLinkedFamilyUsers: async () => {
-    const { currentUser } = get()
+    const { currentUser, userData } = get()
     if (!currentUser || currentUser.role !== 'elderly') return
+
+    // Refresh linked app-users
     const { data: links } = await supabase.from('family_links').select('family_user_id').eq('elderly_user_id', currentUser.id)
     const familyIds = (links ?? []).map((l: { family_user_id: string }) => l.family_user_id)
     const familyProfiles = await Promise.all(familyIds.map(async (fid: string) => {
@@ -319,9 +321,17 @@ export const useStore = create<AppState>((set, get) => ({
     }))
     const resolvedProfiles = (await Promise.all(familyProfiles)).filter(Boolean) as User[]
     const updatedUser = { ...currentUser, linkedFamilyUserIds: familyIds }
+
+    // Also refresh family contacts list
+    const { data: contacts } = await supabase.from('family_members').select('*').eq('elderly_user_id', currentUser.id)
+    const familyMembers = (contacts ?? []).map((f: { id: string; name: string; relation: string; phone: string; email: string }) => ({
+      id: f.id, name: f.name, relation: f.relation, phone: f.phone ?? '', email: f.email ?? '',
+    }))
+
     set(s => ({
       currentUser: updatedUser,
       allUsers: [updatedUser, ...resolvedProfiles, ...s.allUsers.filter(u => u.id !== currentUser.id && !familyIds.includes(u.id))],
+      userData: { ...s.userData, [currentUser.id]: { ...(userData[currentUser.id] ?? emptyUserData()), familyMembers } },
     }))
   },
 

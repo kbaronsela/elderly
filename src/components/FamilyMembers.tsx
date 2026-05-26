@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { FamilyMember } from '../types'
 
@@ -6,10 +6,15 @@ const RELATIONS = ['בן/בת', 'אח/אחות', 'נכד/נכדה', 'חבר/חב
 const emptyMember: Omit<FamilyMember, 'id'> = { name: '', relation: 'בן/בת', phone: '', email: '', appUserId: '' }
 
 export default function FamilyMembers() {
-  const { currentUser, allUsers, getElderlyData, addFamilyMember, updateFamilyMember, deleteFamilyMember, setScreen } = useStore()
+  const { currentUser, allUsers, getElderlyData, addFamilyMember, updateFamilyMember, deleteFamilyMember, refreshLinkedFamilyUsers, setScreen } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<Omit<FamilyMember, 'id'>>(emptyMember)
+
+  // Refresh contacts from Supabase every time this screen opens
+  useEffect(() => {
+    refreshLinkedFamilyUsers()
+  }, [])
 
   if (!currentUser || currentUser.role !== 'elderly') return null
   const { familyMembers } = getElderlyData(currentUser.id)
