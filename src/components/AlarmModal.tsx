@@ -43,20 +43,16 @@ export default function AlarmModal({ alarm }: Props) {
     playSuccessSound()
     logMedicationTaken(alarm)
 
-    const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
-    const elderlyName = currentUser?.name ?? ''
-    const msg = buildMedicationTakenMessage(elderlyName, alarm.medicationNames, timeStr)
-
-    // 1. WhatsApp to phone contacts
+    // WhatsApp to contacts with phone numbers (auto-open; user just taps Send in WhatsApp)
     const data = getElderlyData(alarm.elderlyUserId)
-    if (data.familyMembers.length > 0) {
-      notifyFamilyWhatsApp(data.familyMembers, msg)
+    const phoneContacts = data.familyMembers.filter(m => m.phone?.trim())
+    if (phoneContacts.length > 0) {
+      const timeStr = new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+      const msg = buildMedicationTakenMessage(currentUser?.name ?? '', alarm.medicationNames, timeStr)
+      // Small delay so the alarm modal can close first, then open WhatsApp
+      setTimeout(() => notifyFamilyWhatsApp(phoneContacts, msg), 500)
     }
-
-    // 2. In-app notification: family users linked to this elderly see it in their dashboard
-    // (The log is written to userData[elderlyUserId].medicationLogs, so family members
-    //  who call getElderlyData(elderlyUserId) will see it automatically on next render.)
-    // No extra action needed – the log write in logMedicationTaken() covers this.
+    // App-users: notified automatically via Supabase Realtime (no action needed)
   }
 
   const mins = Math.floor(secondsLeft / 60)
@@ -95,7 +91,7 @@ export default function AlarmModal({ alarm }: Props) {
 
         {(linkedFamilyCount > 0 || familyPhoneCount > 0) && (
           <p className="text-gray-400 text-base">
-            לחיצה תודיע ל-
+            לאחר הלחיצה תישלח הודעה אוטומטית ל-
             {[
               familyPhoneCount > 0 ? `${familyPhoneCount} אנשי קשר (WhatsApp)` : '',
               linkedFamilyCount > 0 ? `${linkedFamilyCount} בני משפחה באפליקציה` : '',

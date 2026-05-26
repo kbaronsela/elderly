@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { DAYS_HE, MONTHS_HE } from '../utils/dateHe'
 import AvatarPicker from './AvatarPicker'
+import { supabase } from '../lib/supabase'
 
 const TABS = ['תרופות', 'היסטוריה', 'יומן'] as const
 type Tab = typeof TABS[number]
@@ -12,6 +13,22 @@ export default function ElderlyDetail() {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
   const elderly = allUsers.find(u => u.id === viewingElderlyId)
+
+  // Realtime: refresh when a new medication log arrives for this elderly
+  useEffect(() => {
+    if (!elderly?.id) return
+    const channel = supabase
+      .channel(`detail-logs-${elderly.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'medication_logs',
+        filter: `elderly_user_id=eq.${elderly.id}`,
+      }, () => {
+        useStore.getState().initSession()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [elderly?.id])
+
   if (!elderly) return null
   const data = getElderlyData(elderly.id)
 

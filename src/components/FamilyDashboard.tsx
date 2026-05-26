@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { formatDateHe } from '../utils/dateHe'
+import { supabase } from '../lib/supabase'
 import type { User } from '../types'
 
 export default function FamilyDashboard() {
@@ -18,6 +19,49 @@ export default function FamilyDashboard() {
     setPhoneSaved(true)
     setTimeout(() => { setPhoneSaved(false); setShowPhoneEdit(false) }, 1500)
   }
+
+  // ── Supabase Realtime: get notified when linked elderly takes medication ────
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'family') return
+    const linkedIds = currentUser.linkedElderlyIds ?? []
+    if (linkedIds.length === 0) return
+
+    const channel = supabase
+      .channel('family-med-logs')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'medication_logs',
+        filter: linkedIds.length === 1
+          ? `elderly_user_id=eq.${linkedIds[0]}`
+          : undefined,
+      }, payload => {
+        const row = payload.new as { elderly_user_id: string; medication_names: string[]; taken_at: string }
+        if (!linkedIds.includes(row.elderly_user_id)) return
+
+        // Show system notification
+        const elderlyUser = getLinkedElderlyUsers().find(u => u.id === row.elderly_user_id)
+        const name = elderlyUser?.name ?? 'הקשיש'
+        const meds = (row.medication_names ?? []).join(', ')
+        const time = new Date(row.taken_at).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' })
+
+        if (Notification.permission === 'granted') {
+          navigator.serviceWorker?.ready.then(reg => {
+            reg.showNotification(`✅ ${name} לקח/ה תרופות`, {
+              body: `${meds} – שעה ${time}`,
+              icon: '/icons/icon-192.png',
+              tag: `med-taken-${row.elderly_user_id}-${time}`,
+            })
+          })
+        }
+
+        // Also refresh local data so dashboard updates live
+        useStore.getState().initSession()
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [currentUser?.id, (currentUser?.linkedElderlyIds ?? []).join(',')])
 
   if (!currentUser || currentUser.role !== 'family') return null
   const linkedElderly = getLinkedElderlyUsers()
