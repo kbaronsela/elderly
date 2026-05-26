@@ -13,10 +13,35 @@ import FamilyDashboard from './components/FamilyDashboard'
 import ElderlyDetail from './components/ElderlyDetail'
 import type { AlarmEvent } from './types'
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+async function requestNotificationPermission() {
+  if (!('Notification' in window)) return
+  if (Notification.permission === 'default') {
+    await Notification.requestPermission()
+  }
+}
+
+function getSW(): ServiceWorker | null {
+  return navigator.serviceWorker?.controller ?? null
+}
+
+function sendToSW(msg: object) {
+  const sw = getSW()
+  if (sw) sw.postMessage(msg)
+}
+
 // ── Alarm scheduler (runs only for elderly users) ─────────────────────────────
 function useAlarmScheduler() {
   const { currentUser, getElderlyData, triggerAlarm, activeAlarm } = useStore()
   const firedRef = useRef<Set<string>>(new Set())
+
+  // Request notification permission once on login
+  useEffect(() => {
+    if (currentUser?.role === 'elderly') {
+      requestNotificationPermission()
+    }
+  }, [currentUser?.id])
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'elderly') return
@@ -27,6 +52,11 @@ function useAlarmScheduler() {
       const today = now.toISOString().slice(0, 10)
       const dayOfWeek = now.getDay()
       const { medications } = getElderlyData(currentUser.id)
+
+      // Always keep SW in sync with current schedules
+      sendToSW({ type: 'MEDICATION_SCHEDULES', schedules: medications })
+      // Tell SW to check right now too
+      sendToSW({ type: 'CHECK_ALARMS' })
 
       const byTime: Record<string, { ids: string[]; names: string[] }> = {}
       medications
