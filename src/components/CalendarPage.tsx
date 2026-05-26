@@ -141,15 +141,14 @@ export default function CalendarPage() {
           <h2 className="text-xl font-bold text-indigo-700 mb-3">🇮🇱 חגים ישראליים – {new Date().getFullYear()}</h2>
           <div className="space-y-2 max-h-72 overflow-y-auto">
             {[...israeliHolidays]
-              .filter(h => h.date.startsWith(String(new Date().getFullYear())))
+              .filter(h => h.date >= new Date().toISOString().slice(0, 10))
               .sort((a, b) => a.date.localeCompare(b.date))
               .map(h => {
               const d = new Date(h.date + 'T12:00:00')
               const todayStr = new Date().toISOString().slice(0, 10)
               const isToday = h.date === todayStr
-              const isPast = h.date < todayStr
               return (
-                <div key={h.date + h.title} className={`flex items-center justify-between rounded-2xl px-4 py-2 ${isToday ? 'bg-blue-100 ring-2 ring-blue-400' : isPast ? 'opacity-40 bg-gray-50' : 'bg-gray-50'}`}>
+                <div key={h.date + h.title} className={`flex items-center justify-between rounded-2xl px-4 py-2 ${isToday ? 'bg-blue-100 ring-2 ring-blue-400' : 'bg-gray-50'}`}>
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🇮🇱</span>
                     <span className={`text-lg ${isToday ? 'font-black text-blue-800' : 'text-gray-800'}`}>{h.hebrew}</span>
