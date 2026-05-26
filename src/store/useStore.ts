@@ -161,7 +161,7 @@ export const useStore = create<AppState>((set, get) => ({
   login: async (username, password) => {
     set({ loading: true, error: null })
     try {
-      const email = `${username}@elderly-care.app`
+      const email = `${username}@elderlycare.com`
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) { set({ loading: false, error: 'שם משתמש או סיסמה שגויים' }); return false }
       await get().initSession()
@@ -182,7 +182,7 @@ export const useStore = create<AppState>((set, get) => ({
   // ── registerElderly ────────────────────────────────────────────────────────
   registerElderly: async (name, username, password) => {
     set({ loading: true, error: null })
-    const email = `${username}@elderly-care.app`
+    const email = `${username}@elderlycare.com`
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error || !data.user) { set({ loading: false, error: error?.message ?? 'שגיאה בהרשמה' }); return }
 
@@ -196,7 +196,7 @@ export const useStore = create<AppState>((set, get) => ({
   // ── registerFamily ─────────────────────────────────────────────────────────
   registerFamily: async (name, username, password) => {
     set({ loading: true, error: null })
-    const email = `${username}@elderly-care.app`
+    const email = `${username}@elderlycare.com`
     const { data, error } = await supabase.auth.signUp({ email, password })
     if (error || !data.user) { set({ loading: false, error: error?.message ?? 'שגיאה בהרשמה' }); return }
 

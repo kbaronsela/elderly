@@ -25,6 +25,9 @@ export default function Login() {
     if (password.length < 6) {
       setError('הסיסמה חייבת להכיל לפחות 6 תווים'); return
     }
+    if (username.length < 3) {
+      setError('שם משתמש חייב להכיל לפחות 3 תווים'); return
+    }
     if (!/^[a-z0-9_]+$/.test(username)) {
       setError('שם משתמש: אותיות אנגלית קטנות, מספרים וקו תחתון בלבד'); return
     }
