@@ -101,10 +101,13 @@ export default function Login() {
               <input
                 type="text"
                 value={username}
-                onChange={e => setUsername(e.target.value)}
+                onChange={e => setUsername(e.target.value.toLowerCase())}
                 placeholder="sara123"
                 className="w-full border-2 border-blue-200 rounded-xl p-4 text-xl focus:border-blue-500 outline-none"
                 autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 dir="ltr"
               />
             </div>
