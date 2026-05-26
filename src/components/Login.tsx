@@ -4,30 +4,33 @@ import { useStore } from '../store/useStore'
 type Mode = 'login' | 'register-elderly' | 'register-family'
 
 export default function Login() {
-  const { login, registerElderly, registerFamily } = useStore()
+  const { login, registerElderly, registerFamily, loading, error: storeError } = useStore()
   const [mode, setMode] = useState<Mode>('login')
   const [name, setName] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (mode === 'login') {
-      if (!login(username, password)) setError('שם משתמש או סיסמה שגויים')
+      const ok = await login(username, password)
+      if (!ok) setError(storeError ?? 'שם משתמש או סיסמה שגויים')
       return
     }
     if (!name.trim() || !username.trim() || !password.trim()) {
-      setError('יש למלא את כל השדות')
-      return
+      setError('יש למלא את כל השדות'); return
     }
-    if (password.length < 4) {
-      setError('הסיסמה חייבת להכיל לפחות 4 תווים')
-      return
+    if (password.length < 6) {
+      setError('הסיסמה חייבת להכיל לפחות 6 תווים'); return
     }
-    if (mode === 'register-elderly') registerElderly(name.trim(), username.trim(), password)
-    else registerFamily(name.trim(), username.trim(), password)
+    if (!/^[a-z0-9_]+$/.test(username)) {
+      setError('שם משתמש: אותיות אנגלית קטנות, מספרים וקו תחתון בלבד'); return
+    }
+    if (mode === 'register-elderly') await registerElderly(name.trim(), username.trim(), password)
+    else await registerFamily(name.trim(), username.trim(), password)
+    if (storeError) setError(storeError)
   }
 
   const isRegister = mode !== 'login'
@@ -123,9 +126,10 @@ export default function Login() {
 
             <button
               type="submit"
-              className={`btn-big w-full text-white shadow-lg ${mode === 'register-family' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+              disabled={loading}
+              className={`btn-big w-full text-white shadow-lg disabled:opacity-60 ${mode === 'register-family' ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'}`}
             >
-              {mode === 'login' ? '🔑 כניסה' : mode === 'register-elderly' ? '✅ הרשמה כקשיש' : '✅ הרשמה כבן משפחה'}
+              {loading ? '⏳ מתחבר...' : mode === 'login' ? '🔑 כניסה' : mode === 'register-elderly' ? '✅ הרשמה כקשיש' : '✅ הרשמה כבן משפחה'}
             </button>
           </form>
         </div>

@@ -11,6 +11,7 @@
     "deploy": "npm run build && gh-pages -d dist --dotfiles"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
     "date-fns": "^4.3.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
@@ -30,6 +31,7 @@
     "eslint-plugin-react-refresh": "^0.5.2",
     "gh-pages": "^6.3.0",
     "globals": "^17.6.0",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.3.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",

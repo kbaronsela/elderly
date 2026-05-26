@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { supabase } from '../lib/supabase'
 import type {
   User, UserData, FamilyMember, Medication,
   MedicationLog, AppScreen, AlarmEvent, CalendarEvent,
@@ -7,365 +7,365 @@ import type {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function hashPassword(password: string): string {
-  let hash = 0
-  for (let i = 0; i < password.length; i++) {
-    const char = password.charCodeAt(i)
-    hash = (hash << 5) - hash + char
-    hash = hash & hash
-  }
-  return hash.toString(36)
-}
-
 function uid(): string {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36)
+  return crypto.randomUUID()
 }
 
 const emptyUserData = (): UserData => ({
-  familyMembers: [],
-  medications: [],
-  medicationLogs: [],
-  calendarEvents: [],
+  familyMembers: [], medications: [], medicationLogs: [], calendarEvents: [],
 })
 
-// ─── State shape ─────────────────────────────────────────────────────────────
+// ─── State ───────────────────────────────────────────────────────────────────
 
 interface AppState {
   currentUser: User | null
-  users: User[]
-  /** Data for each elderly user, keyed by their userId */
+  allUsers: User[]           // cached profiles visible to current user
   userData: Record<string, UserData>
   screen: AppScreen
   activeAlarm: AlarmEvent | null
-  /** For family members: which elderly userId are they currently viewing */
   viewingElderlyId: string | null
+  loading: boolean
+  error: string | null
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  login: (username: string, password: string) => boolean
-  logout: () => void
-  registerElderly: (name: string, username: string, password: string) => void
-  registerFamily: (name: string, username: string, password: string) => void
+  // Auth
+  login: (username: string, password: string) => Promise<boolean>
+  logout: () => Promise<void>
+  registerElderly: (name: string, username: string, password: string) => Promise<void>
+  registerFamily: (name: string, username: string, password: string) => Promise<void>
+  initSession: () => Promise<void>
 
-  // ── Navigation ────────────────────────────────────────────────────────────
+  // Navigation
   setScreen: (screen: AppScreen) => void
   setViewingElderlyId: (id: string | null) => void
 
-  // ── User profile ──────────────────────────────────────────────────────────
-  updateUser: (updates: Partial<User>) => void
+  // Profile
+  updateUser: (updates: Partial<User>) => Promise<void>
 
-  // ── Linking ───────────────────────────────────────────────────────────────
-  /** Family member links to an elderly person by username. Returns true if found. */
-  linkToElderly: (elderlyUsername: string) => boolean
-  /** Elderly person unlinks a family user */
-  unlinkFamilyUser: (familyUserId: string) => void
+  // Linking
+  linkToElderly: (elderlyUsername: string) => Promise<boolean>
+  unlinkFamilyUser: (familyUserId: string) => Promise<void>
 
-  // ── Family contacts (elderly's address book) ──────────────────────────────
-  addFamilyMember: (member: Omit<FamilyMember, 'id'>) => void
-  updateFamilyMember: (id: string, updates: Partial<FamilyMember>) => void
-  deleteFamilyMember: (id: string) => void
+  // Medications
+  addMedication: (med: Omit<Medication, 'id'>) => Promise<void>
+  updateMedication: (id: string, updates: Partial<Medication>) => Promise<void>
+  deleteMedication: (id: string) => Promise<void>
 
-  // ── Medications ───────────────────────────────────────────────────────────
-  addMedication: (med: Omit<Medication, 'id'>) => void
-  updateMedication: (id: string, updates: Partial<Medication>) => void
-  deleteMedication: (id: string) => void
+  // Family contacts
+  addFamilyMember: (member: Omit<FamilyMember, 'id'>) => Promise<void>
+  updateFamilyMember: (id: string, updates: Partial<FamilyMember>) => Promise<void>
+  deleteFamilyMember: (id: string) => Promise<void>
 
-  // ── Alarm / logs ──────────────────────────────────────────────────────────
+  // Alarm / logs
   triggerAlarm: (alarm: AlarmEvent) => void
   dismissAlarm: () => void
-  logMedicationTaken: (alarm: AlarmEvent) => void
+  logMedicationTaken: (alarm: AlarmEvent) => Promise<void>
 
-  // ── Calendar ──────────────────────────────────────────────────────────────
-  addCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => void
+  // Calendar
+  addCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => Promise<void>
   setCalendarEvents: (events: CalendarEvent[]) => void
 
-  // ── Selectors (computed helpers) ──────────────────────────────────────────
+  // Selectors
   getElderlyData: (elderlyUserId: string) => UserData
   getLinkedElderlyUsers: () => User[]
 }
 
+// ─── Data loader helpers ──────────────────────────────────────────────────────
+
+async function loadElderlyData(elderlyId: string): Promise<UserData> {
+  const [meds, logs, fam, cal] = await Promise.all([
+    supabase.from('medications').select('*').eq('elderly_user_id', elderlyId),
+    supabase.from('medication_logs').select('*').eq('elderly_user_id', elderlyId).order('taken_at', { ascending: false }).limit(100),
+    supabase.from('family_members').select('*').eq('elderly_user_id', elderlyId),
+    supabase.from('calendar_events').select('*').eq('elderly_user_id', elderlyId),
+  ])
+
+  return {
+    medications: (meds.data ?? []).map(m => ({
+      id: m.id, name: m.name, times: m.times, days: m.days, notes: m.notes, active: m.active,
+    })),
+    medicationLogs: (logs.data ?? []).map(l => ({
+      id: l.id, elderlyUserId: l.elderly_user_id, medicationIds: [],
+      medicationNames: l.medication_names, scheduledTime: l.scheduled_time ?? '',
+      takenAt: l.taken_at, notifiedFamily: false,
+    })),
+    familyMembers: (fam.data ?? []).map(f => ({
+      id: f.id, name: f.name, relation: f.relation, phone: f.phone, email: f.email,
+    })),
+    calendarEvents: (cal.data ?? []).map(e => ({
+      id: e.id, title: e.title, date: e.date, time: e.time,
+      isHoliday: e.is_holiday, isBirthday: e.is_birthday,
+    })),
+  }
+}
+
+async function buildUserFromProfile(profile: { id: string; username: string; name: string; role: string; wake_up_time: string }, linkedElderlyIds?: string[], linkedFamilyUserIds?: string[]): Promise<User> {
+  return {
+    id: profile.id,
+    username: profile.username,
+    name: profile.name,
+    passwordHash: '',
+    role: profile.role as 'elderly' | 'family',
+    wakeUpTime: profile.wake_up_time,
+    googleCalendarConnected: false,
+    linkedElderlyIds,
+    linkedFamilyUserIds,
+  }
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
-export const useStore = create<AppState>()(
-  persist(
-    (set, get) => ({
-      currentUser: null,
-      users: [],
-      userData: {},
-      screen: 'login',
-      activeAlarm: null,
-      viewingElderlyId: null,
+export const useStore = create<AppState>((set, get) => ({
+  currentUser: null,
+  allUsers: [],
+  userData: {},
+  screen: 'login',
+  activeAlarm: null,
+  viewingElderlyId: null,
+  loading: false,
+  error: null,
 
-      // ── Auth ───────────────────────────────────────────────────────────────
+  // ── initSession: called on app load to restore existing session ────────────
+  initSession: async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) return
 
-      login: (username, password) => {
-        const hash = hashPassword(password)
-        const user = get().users.find(u => u.username === username && u.passwordHash === hash)
-        if (!user) return false
-        const screen = user.role === 'family' ? 'family-dashboard' : 'dashboard'
-        set({ currentUser: user, screen })
-        return true
-      },
+    const { data: profile } = await supabase
+      .from('profiles').select('*').eq('id', session.user.id).single()
+    if (!profile) return
 
-      logout: () => set({ currentUser: null, screen: 'login', activeAlarm: null, viewingElderlyId: null }),
+    if (profile.role === 'elderly') {
+      const { data: links } = await supabase.from('family_links').select('family_user_id').eq('elderly_user_id', profile.id)
+      const user = await buildUserFromProfile(profile, [], (links ?? []).map((l: { family_user_id: string }) => l.family_user_id))
+      const data = await loadElderlyData(profile.id)
+      set({ currentUser: user, userData: { [user.id]: data }, screen: 'dashboard' })
+    } else {
+      const { data: links } = await supabase.from('family_links').select('elderly_user_id').eq('family_user_id', profile.id)
+      const elderlyIds = (links ?? []).map((l: { elderly_user_id: string }) => l.elderly_user_id)
+      const user = await buildUserFromProfile(profile, elderlyIds, [])
 
-      registerElderly: (name, username, password) => {
-        const newUser: User = {
-          id: uid(), name, username,
-          passwordHash: hashPassword(password),
-          role: 'elderly',
-          wakeUpTime: '07:00',
-          googleCalendarConnected: false,
-          linkedFamilyUserIds: [],
+      // Load all linked elderly profiles + data
+      const allUsers: User[] = [user]
+      const userData: Record<string, UserData> = {}
+      await Promise.all(elderlyIds.map(async (eid: string) => {
+        const { data: ep } = await supabase.from('profiles').select('*').eq('id', eid).single()
+        if (ep) {
+          allUsers.push(await buildUserFromProfile(ep))
+          userData[eid] = await loadElderlyData(eid)
         }
-        set(s => ({
-          users: [...s.users, newUser],
-          userData: { ...s.userData, [newUser.id]: emptyUserData() },
-          currentUser: newUser,
-          screen: 'dashboard',
-        }))
-      },
-
-      registerFamily: (name, username, password) => {
-        const newUser: User = {
-          id: uid(), name, username,
-          passwordHash: hashPassword(password),
-          role: 'family',
-          linkedElderlyIds: [],
-        }
-        set(s => ({
-          users: [...s.users, newUser],
-          currentUser: newUser,
-          screen: 'family-dashboard',
-        }))
-      },
-
-      // ── Navigation ─────────────────────────────────────────────────────────
-
-      setScreen: (screen) => set({ screen }),
-      setViewingElderlyId: (id) => set({ viewingElderlyId: id }),
-
-      // ── User profile ───────────────────────────────────────────────────────
-
-      updateUser: (updates) => {
-        const { currentUser, users } = get()
-        if (!currentUser) return
-        const updated = { ...currentUser, ...updates }
-        set({ currentUser: updated, users: users.map(u => u.id === currentUser.id ? updated : u) })
-      },
-
-      // ── Linking ────────────────────────────────────────────────────────────
-
-      linkToElderly: (elderlyUsername) => {
-        const { currentUser, users } = get()
-        if (!currentUser || currentUser.role !== 'family') return false
-        const elderly = users.find(u => u.username === elderlyUsername && u.role === 'elderly')
-        if (!elderly) return false
-        // Already linked?
-        if (currentUser.linkedElderlyIds?.includes(elderly.id)) return true
-
-        // Update family user's linked list
-        const updatedFamily = {
-          ...currentUser,
-          linkedElderlyIds: [...(currentUser.linkedElderlyIds ?? []), elderly.id],
-        }
-        // Update elderly user's linked family list
-        const updatedElderly = {
-          ...elderly,
-          linkedFamilyUserIds: [...(elderly.linkedFamilyUserIds ?? []), currentUser.id],
-        }
-        set(s => ({
-          currentUser: updatedFamily,
-          users: s.users.map(u =>
-            u.id === currentUser.id ? updatedFamily :
-            u.id === elderly.id ? updatedElderly : u
-          ),
-        }))
-        return true
-      },
-
-      unlinkFamilyUser: (familyUserId) => {
-        const { currentUser, users } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const familyUser = users.find(u => u.id === familyUserId)
-        const updatedElderly = {
-          ...currentUser,
-          linkedFamilyUserIds: (currentUser.linkedFamilyUserIds ?? []).filter(id => id !== familyUserId),
-        }
-        const updatedFamily = familyUser ? {
-          ...familyUser,
-          linkedElderlyIds: (familyUser.linkedElderlyIds ?? []).filter(id => id !== currentUser.id),
-        } : null
-        set(s => ({
-          currentUser: updatedElderly,
-          users: s.users.map(u =>
-            u.id === currentUser.id ? updatedElderly :
-            updatedFamily && u.id === familyUserId ? updatedFamily : u
-          ),
-        }))
-      },
-
-      // ── Family contacts ────────────────────────────────────────────────────
-
-      addFamilyMember: (member) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: {
-            ...s.userData,
-            [currentUser.id]: {
-              ...bucket,
-              familyMembers: [...bucket.familyMembers, { ...member, id: uid() }],
-            },
-          },
-        }))
-      },
-
-      updateFamilyMember: (id, updates) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: {
-            ...s.userData,
-            [currentUser.id]: {
-              ...bucket,
-              familyMembers: bucket.familyMembers.map(m => m.id === id ? { ...m, ...updates } : m),
-            },
-          },
-        }))
-      },
-
-      deleteFamilyMember: (id) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: {
-            ...s.userData,
-            [currentUser.id]: {
-              ...bucket,
-              familyMembers: bucket.familyMembers.filter(m => m.id !== id),
-            },
-          },
-        }))
-      },
-
-      // ── Medications ────────────────────────────────────────────────────────
-
-      addMedication: (med) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: {
-            ...s.userData,
-            [currentUser.id]: { ...bucket, medications: [...bucket.medications, { ...med, id: uid() }] },
-          },
-        }))
-      },
-
-      updateMedication: (id, updates) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: {
-            ...s.userData,
-            [currentUser.id]: {
-              ...bucket,
-              medications: bucket.medications.map(m => m.id === id ? { ...m, ...updates } : m),
-            },
-          },
-        }))
-      },
-
-      deleteMedication: (id) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: {
-            ...s.userData,
-            [currentUser.id]: { ...bucket, medications: bucket.medications.filter(m => m.id !== id) },
-          },
-        }))
-      },
-
-      // ── Alarm / logs ───────────────────────────────────────────────────────
-
-      triggerAlarm: (alarm) => set({ activeAlarm: alarm }),
-
-      dismissAlarm: () => set({ activeAlarm: null }),
-
-      logMedicationTaken: (alarm) => {
-        const { userData } = get()
-        const bucket = userData[alarm.elderlyUserId] ?? emptyUserData()
-        const log: MedicationLog = {
-          id: uid(),
-          elderlyUserId: alarm.elderlyUserId,
-          medicationIds: alarm.medicationIds,
-          medicationNames: alarm.medicationNames,
-          scheduledTime: `${alarm.triggerDate}T${alarm.scheduledTime}:00`,
-          takenAt: new Date().toISOString(),
-          notifiedFamily: false,
-        }
-        set(s => ({
-          activeAlarm: null,
-          userData: {
-            ...s.userData,
-            [alarm.elderlyUserId]: { ...bucket, medicationLogs: [...bucket.medicationLogs, log] },
-          },
-        }))
-      },
-
-      // ── Calendar ───────────────────────────────────────────────────────────
-
-      addCalendarEvent: (event) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: {
-            ...s.userData,
-            [currentUser.id]: {
-              ...bucket,
-              calendarEvents: [...bucket.calendarEvents, { ...event, id: uid() }],
-            },
-          },
-        }))
-      },
-
-      setCalendarEvents: (events) => {
-        const { currentUser, userData } = get()
-        if (!currentUser || currentUser.role !== 'elderly') return
-        const bucket = userData[currentUser.id] ?? emptyUserData()
-        set(s => ({
-          userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: events } },
-        }))
-      },
-
-      // ── Selectors ──────────────────────────────────────────────────────────
-
-      getElderlyData: (elderlyUserId) => {
-        return get().userData[elderlyUserId] ?? emptyUserData()
-      },
-
-      getLinkedElderlyUsers: () => {
-        const { currentUser, users } = get()
-        if (!currentUser || currentUser.role !== 'family') return []
-        return (currentUser.linkedElderlyIds ?? [])
-          .map(id => users.find(u => u.id === id))
-          .filter(Boolean) as User[]
-      },
-    }),
-    {
-      name: 'elderly-app-storage-v2',
-      partialize: (state) => ({
-        users: state.users,
-        userData: state.userData,
-        currentUser: state.currentUser,
-      }),
+      }))
+      set({ currentUser: user, allUsers, userData, screen: 'family-dashboard' })
     }
-  )
-)
+  },
+
+  // ── login ──────────────────────────────────────────────────────────────────
+  login: async (username, password) => {
+    set({ loading: true, error: null })
+    try {
+      const email = `${username}@elderly-care.app`
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) { set({ loading: false, error: 'שם משתמש או סיסמה שגויים' }); return false }
+      await get().initSession()
+      set({ loading: false })
+      return true
+    } catch {
+      set({ loading: false, error: 'שגיאה בחיבור' })
+      return false
+    }
+  },
+
+  // ── logout ─────────────────────────────────────────────────────────────────
+  logout: async () => {
+    await supabase.auth.signOut()
+    set({ currentUser: null, allUsers: [], userData: {}, screen: 'login', activeAlarm: null, viewingElderlyId: null })
+  },
+
+  // ── registerElderly ────────────────────────────────────────────────────────
+  registerElderly: async (name, username, password) => {
+    set({ loading: true, error: null })
+    const email = `${username}@elderly-care.app`
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error || !data.user) { set({ loading: false, error: error?.message ?? 'שגיאה בהרשמה' }); return }
+
+    await supabase.from('profiles').insert({
+      id: data.user.id, username, name, role: 'elderly', wake_up_time: '07:00',
+    })
+    const user = await buildUserFromProfile({ id: data.user.id, username, name, role: 'elderly', wake_up_time: '07:00' }, [], [])
+    set({ currentUser: user, userData: { [user.id]: emptyUserData() }, screen: 'dashboard', loading: false })
+  },
+
+  // ── registerFamily ─────────────────────────────────────────────────────────
+  registerFamily: async (name, username, password) => {
+    set({ loading: true, error: null })
+    const email = `${username}@elderly-care.app`
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error || !data.user) { set({ loading: false, error: error?.message ?? 'שגיאה בהרשמה' }); return }
+
+    await supabase.from('profiles').insert({
+      id: data.user.id, username, name, role: 'family', wake_up_time: '07:00',
+    })
+    const user = await buildUserFromProfile({ id: data.user.id, username, name, role: 'family', wake_up_time: '07:00' }, [], [])
+    set({ currentUser: user, allUsers: [user], screen: 'family-dashboard', loading: false })
+  },
+
+  // ── navigation ─────────────────────────────────────────────────────────────
+  setScreen: (screen) => set({ screen }),
+  setViewingElderlyId: (id) => set({ viewingElderlyId: id }),
+
+  // ── updateUser ─────────────────────────────────────────────────────────────
+  updateUser: async (updates) => {
+    const { currentUser } = get()
+    if (!currentUser) return
+    const updated = { ...currentUser, ...updates }
+    await supabase.from('profiles').update({
+      name: updated.name,
+      wake_up_time: updated.wakeUpTime,
+    }).eq('id', currentUser.id)
+    set({ currentUser: updated })
+  },
+
+  // ── linkToElderly ──────────────────────────────────────────────────────────
+  linkToElderly: async (elderlyUsername) => {
+    const { currentUser } = get()
+    if (!currentUser || currentUser.role !== 'family') return false
+
+    const { data: profile } = await supabase
+      .from('profiles').select('*').eq('username', elderlyUsername).eq('role', 'elderly').single()
+    if (!profile) return false
+
+    const { error } = await supabase.from('family_links').insert({
+      family_user_id: currentUser.id,
+      elderly_user_id: profile.id,
+    })
+    if (error && error.code !== '23505') return false // 23505 = duplicate key (already linked)
+
+    // Load elderly data
+    const elderlyUser = await buildUserFromProfile(profile)
+    const data = await loadElderlyData(profile.id)
+    const updatedIds = [...(currentUser.linkedElderlyIds ?? []).filter(id => id !== profile.id), profile.id]
+    const updatedUser = { ...currentUser, linkedElderlyIds: updatedIds }
+    set(s => ({
+      currentUser: updatedUser,
+      allUsers: [...s.allUsers.filter(u => u.id !== profile.id), elderlyUser],
+      userData: { ...s.userData, [profile.id]: data },
+    }))
+    return true
+  },
+
+  // ── unlinkFamilyUser ───────────────────────────────────────────────────────
+  unlinkFamilyUser: async (familyUserId) => {
+    const { currentUser } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    await supabase.from('family_links').delete()
+      .eq('family_user_id', familyUserId).eq('elderly_user_id', currentUser.id)
+    const updated = { ...currentUser, linkedFamilyUserIds: (currentUser.linkedFamilyUserIds ?? []).filter(id => id !== familyUserId) }
+    set({ currentUser: updated })
+  },
+
+  // ── Medications ────────────────────────────────────────────────────────────
+  addMedication: async (med) => {
+    const { currentUser, userData } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const newMed = { ...med, id: uid() }
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, medications: [...bucket.medications, newMed] } } }))
+    await supabase.from('medications').insert({
+      id: newMed.id, elderly_user_id: currentUser.id,
+      name: med.name, times: med.times, days: med.days, notes: med.notes, active: med.active,
+    })
+  },
+
+  updateMedication: async (id, updates) => {
+    const { currentUser, userData } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, medications: bucket.medications.map(m => m.id === id ? { ...m, ...updates } : m) } } }))
+    await supabase.from('medications').update({ name: updates.name, times: updates.times, days: updates.days, notes: updates.notes, active: updates.active }).eq('id', id)
+  },
+
+  deleteMedication: async (id) => {
+    const { currentUser, userData } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, medications: bucket.medications.filter(m => m.id !== id) } } }))
+    await supabase.from('medications').delete().eq('id', id)
+  },
+
+  // ── Family contacts ────────────────────────────────────────────────────────
+  addFamilyMember: async (member) => {
+    const { currentUser, userData } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const newMember = { ...member, id: uid() }
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, familyMembers: [...bucket.familyMembers, newMember] } } }))
+    await supabase.from('family_members').insert({ id: newMember.id, elderly_user_id: currentUser.id, name: member.name, relation: member.relation, phone: member.phone, email: member.email ?? '' })
+  },
+
+  updateFamilyMember: async (id, updates) => {
+    const { currentUser, userData } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, familyMembers: bucket.familyMembers.map(m => m.id === id ? { ...m, ...updates } : m) } } }))
+    await supabase.from('family_members').update({ name: updates.name, relation: updates.relation, phone: updates.phone, email: updates.email }).eq('id', id)
+  },
+
+  deleteFamilyMember: async (id) => {
+    const { currentUser, userData } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, familyMembers: bucket.familyMembers.filter(m => m.id !== id) } } }))
+    await supabase.from('family_members').delete().eq('id', id)
+  },
+
+  // ── Alarm ──────────────────────────────────────────────────────────────────
+  triggerAlarm: (alarm) => set({ activeAlarm: alarm }),
+  dismissAlarm: () => set({ activeAlarm: null }),
+
+  logMedicationTaken: async (alarm) => {
+    const { userData } = get()
+    const bucket = userData[alarm.elderlyUserId] ?? emptyUserData()
+    const log: MedicationLog = {
+      id: uid(), elderlyUserId: alarm.elderlyUserId,
+      medicationIds: alarm.medicationIds, medicationNames: alarm.medicationNames,
+      scheduledTime: `${alarm.triggerDate}T${alarm.scheduledTime}:00`,
+      takenAt: new Date().toISOString(), notifiedFamily: false,
+    }
+    set(s => ({
+      activeAlarm: null,
+      userData: { ...s.userData, [alarm.elderlyUserId]: { ...bucket, medicationLogs: [log, ...bucket.medicationLogs] } },
+    }))
+    await supabase.from('medication_logs').insert({
+      id: log.id, elderly_user_id: alarm.elderlyUserId,
+      medication_names: alarm.medicationNames,
+      scheduled_time: `${alarm.triggerDate}T${alarm.scheduledTime}:00`,
+      taken_at: log.takenAt,
+    })
+  },
+
+  // ── Calendar ───────────────────────────────────────────────────────────────
+  addCalendarEvent: async (event) => {
+    const { currentUser, userData } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const newEvent = { ...event, id: uid() }
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: [...bucket.calendarEvents, newEvent] } } }))
+    await supabase.from('calendar_events').insert({ id: newEvent.id, elderly_user_id: currentUser.id, title: event.title, date: event.date, time: event.time ?? '', is_holiday: event.isHoliday ?? false, is_birthday: event.isBirthday ?? false })
+  },
+
+  setCalendarEvents: (events) => {
+    const { currentUser } = get()
+    if (!currentUser) return
+    const bucket = get().userData[currentUser.id] ?? emptyUserData()
+    const removed = bucket.calendarEvents.filter(e => !events.find(ne => ne.id === e.id))
+    removed.forEach(e => supabase.from('calendar_events').delete().eq('id', e.id))
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: events } } }))
+  },
+
+  // ── Selectors ──────────────────────────────────────────────────────────────
+  getElderlyData: (elderlyUserId) => get().userData[elderlyUserId] ?? emptyUserData(),
+
+  getLinkedElderlyUsers: () => {
+    const { currentUser, allUsers } = get()
+    if (!currentUser || currentUser.role !== 'family') return []
+    return (currentUser.linkedElderlyIds ?? []).map(id => allUsers.find(u => u.id === id)).filter(Boolean) as User[]
+  },
+}))

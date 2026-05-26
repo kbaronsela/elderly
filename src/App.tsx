@@ -130,7 +130,12 @@ function AuthenticatedApp() {
 }
 
 export default function App() {
-  const screen = useStore(s => s.screen)
+  const { screen, initSession } = useStore()
+
+  useEffect(() => {
+    initSession()
+  }, [])
+
   if (screen === 'login') return <Login />
   return <AuthenticatedApp />
 }

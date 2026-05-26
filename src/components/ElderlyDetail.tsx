@@ -6,10 +6,10 @@ const TABS = ['תרופות', 'היסטוריה', 'יומן'] as const
 type Tab = typeof TABS[number]
 
 export default function ElderlyDetail() {
-  const { viewingElderlyId, users, getElderlyData, setScreen, setViewingElderlyId } = useStore()
+  const { viewingElderlyId, allUsers, getElderlyData, setScreen, setViewingElderlyId } = useStore()
   const [tab, setTab] = useState<Tab>('תרופות')
 
-  const elderly = users.find(u => u.id === viewingElderlyId)
+  const elderly = allUsers.find(u => u.id === viewingElderlyId)
   if (!elderly) return null
   const data = getElderlyData(elderly.id)
 

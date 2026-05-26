@@ -6,7 +6,7 @@ const RELATIONS = ['בן/בת', 'אח/אחות', 'נכד/נכדה', 'חבר/חב
 const emptyMember: Omit<FamilyMember, 'id'> = { name: '', relation: 'בן/בת', phone: '', email: '', appUserId: '' }
 
 export default function FamilyMembers() {
-  const { currentUser, users, getElderlyData, addFamilyMember, updateFamilyMember, deleteFamilyMember, setScreen } = useStore()
+  const { currentUser, allUsers, getElderlyData, addFamilyMember, updateFamilyMember, deleteFamilyMember, setScreen } = useStore()
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<Omit<FamilyMember, 'id'>>(emptyMember)
@@ -29,7 +29,7 @@ export default function FamilyMembers() {
   // Lookup registered app user for a contact
   function getAppUser(appUserId?: string) {
     if (!appUserId) return null
-    return users.find(u => u.id === appUserId) ?? null
+    return allUsers.find(u => u.id === appUserId) ?? null
   }
 
   return (

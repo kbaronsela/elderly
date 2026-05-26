@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store/useStore'
 
 export default function Settings() {
-  const { currentUser, users, updateUser, unlinkFamilyUser, logout, setScreen } = useStore()
+  const { currentUser, allUsers, updateUser, unlinkFamilyUser, logout, setScreen } = useStore()
   const [name, setName] = useState(currentUser?.name ?? '')
   const [wakeTime, setWakeTime] = useState(currentUser?.wakeUpTime ?? '07:00')
   const [saved, setSaved] = useState(false)
@@ -17,8 +17,8 @@ export default function Settings() {
 
   // Linked family app-users
   const linkedFamilyUsers = (currentUser.linkedFamilyUserIds ?? [])
-    .map(id => users.find(u => u.id === id))
-    .filter(Boolean) as typeof users
+    .map(id => allUsers.find(u => u.id === id))
+    .filter(Boolean) as typeof allUsers
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 pb-28">
