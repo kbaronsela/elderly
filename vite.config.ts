@@ -12,7 +12,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png'],
+      includeAssets: ['favicon.png', 'icons/*.png'],
       manifest: {
         name: 'עוזר לגיל הזהב',
         short_name: 'עוזר',
