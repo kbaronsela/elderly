@@ -1,7 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
 import type { CalendarEvent } from '../types'
 import { parseIcs, exportToIcs, downloadIcs } from '../utils/ics'
+import { fetchIsraeliHolidays, getUpcomingHolidays } from '../utils/holidays'
+import type { IsraeliHoliday } from '../utils/holidays'
 
 const MONTHS_HE = ['ינואר','פברואר','מרץ','אפריל','מאי','יוני','יולי','אוגוסט','ספטמבר','אוקטובר','נובמבר','דצמבר']
 
@@ -15,7 +17,12 @@ export default function CalendarPage() {
   const [form, setForm] = useState<Omit<CalendarEvent, 'id'>>(emptyEvent)
   const [importMsg, setImportMsg] = useState('')
   const [showSyncHelp, setShowSyncHelp] = useState(false)
+  const [israeliHolidays, setIsraeliHolidays] = useState<IsraeliHoliday[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetchIsraeliHolidays(new Date().getFullYear()).then(setIsraeliHolidays)
+  }, [])
 
   if (!currentUser || currentUser.role !== 'elderly') return null
   const { calendarEvents } = getElderlyData(currentUser.id)
@@ -128,10 +135,35 @@ export default function CalendarPage() {
         ➕ הוסף אירוע
       </button>
 
+      {/* Israeli holidays */}
+      {israeliHolidays.length > 0 && (
+        <div className="bg-white rounded-3xl shadow p-5 mb-5">
+          <h2 className="text-xl font-bold text-indigo-700 mb-3">🇮🇱 חגים ישראליים – {new Date().getFullYear()}</h2>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {getUpcomingHolidays(israeliHolidays, 365).map(h => {
+              const d = new Date(h.date + 'T12:00:00')
+              const isToday = h.date === new Date().toISOString().slice(0, 10)
+              return (
+                <div key={h.date + h.title} className={`flex items-center justify-between rounded-2xl px-4 py-2 ${isToday ? 'bg-blue-100 font-bold' : 'bg-gray-50'}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🇮🇱</span>
+                    <span className="text-lg text-gray-800">{h.hebrew}</span>
+                    {isToday && <span className="text-blue-600 text-sm font-bold">היום!</span>}
+                  </div>
+                  <span className="text-base text-gray-500 dir-ltr">
+                    {d.getDate()}/{d.getMonth() + 1}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {sorted.length === 0 && (
         <div className="text-center text-xl text-gray-500 py-10">
           <div className="text-6xl mb-4">📅</div>
-          <p>אין אירועים בלוח השנה</p>
+          <p>אין אירועים אישיים בלוח השנה</p>
         </div>
       )}
 

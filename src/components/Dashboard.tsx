@@ -1,14 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { formatDateHe, formatTimeHe } from '../utils/dateHe'
+import { fetchIsraeliHolidays, getTodayHoliday, getUpcomingHolidays } from '../utils/holidays'
+import type { IsraeliHoliday } from '../utils/holidays'
 
 export default function Dashboard() {
   const { currentUser, getElderlyData, setScreen } = useStore()
   const [now, setNow] = useState(new Date())
+  const [holidays, setHolidays] = useState<IsraeliHoliday[]>([])
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 30000)
     return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
+    fetchIsraeliHolidays(new Date().getFullYear()).then(setHolidays)
   }, [])
 
   if (!currentUser || currentUser.role !== 'elderly') return null
@@ -22,6 +29,8 @@ export default function Dashboard() {
     .sort((a, b) => a.time.localeCompare(b.time))
 
   const todayEvents = calendarEvents.filter(e => e.date === todayStr)
+  const todayHoliday = getTodayHoliday(holidays)
+  const upcomingHolidays = getUpcomingHolidays(holidays, 14).filter(h => h.date !== todayStr)
 
   const hour = now.getHours()
   const greeting = hour < 12 ? 'בוקר טוב' : hour < 17 ? 'צהריים טובים' : 'ערב טוב'
@@ -34,6 +43,34 @@ export default function Dashboard() {
         <p className="text-2xl text-gray-600 mt-2">{formatDateHe(now)}</p>
         <p className="text-4xl font-bold text-blue-800 mt-1">{formatTimeHe(now)}</p>
       </div>
+
+      {/* Today's Israeli holiday */}
+      {todayHoliday && (
+        <div className="bg-blue-600 rounded-3xl p-5 mb-5 text-white text-center shadow-lg">
+          <p className="text-4xl mb-1">🇮🇱</p>
+          <p className="text-2xl font-black">{todayHoliday.hebrew}</p>
+          <p className="text-lg opacity-80">חג שמח!</p>
+        </div>
+      )}
+
+      {/* Upcoming holidays in next 14 days */}
+      {upcomingHolidays.length > 0 && (
+        <div className="bg-indigo-50 border-2 border-indigo-200 rounded-3xl p-4 mb-5">
+          <h2 className="text-xl font-bold text-indigo-800 mb-2">🗓️ חגים קרובים</h2>
+          <div className="space-y-1">
+            {upcomingHolidays.slice(0, 3).map(h => {
+              const d = new Date(h.date + 'T12:00:00')
+              const days = Math.round((d.getTime() - Date.now()) / 86400000)
+              return (
+                <div key={h.date} className="flex justify-between items-center text-lg text-indigo-700">
+                  <span>🇮🇱 {h.hebrew}</span>
+                  <span className="text-sm text-indigo-400">בעוד {days} ימים</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Calendar events today */}
       {todayEvents.length > 0 && (
