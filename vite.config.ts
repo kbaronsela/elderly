@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-const BASE = '/elderly/'
+const BASE = process.env.GITHUB_PAGES ? '/elderly/' : '/'
 
 export default defineConfig({
   base: BASE,
@@ -20,8 +20,8 @@ export default defineConfig({
         theme_color: '#2563eb',
         background_color: '#f0f9ff',
         display: 'standalone',
-        start_url: BASE,
-        scope: BASE,
+        start_url: '/',
+        scope: '/',
         lang: 'he',
         dir: 'rtl',
         icons: [
