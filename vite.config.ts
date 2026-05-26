@@ -3,13 +3,16 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const BASE = '/elderly/'
+
 export default defineConfig({
+  base: BASE,
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/*.png', 'sounds/*.mp3'],
+      includeAssets: ['favicon.ico', 'icons/*.png'],
       manifest: {
         name: 'עוזר לגיל הזהב',
         short_name: 'עוזר',
@@ -17,7 +20,8 @@ export default defineConfig({
         theme_color: '#2563eb',
         background_color: '#f0f9ff',
         display: 'standalone',
-        start_url: '/',
+        start_url: BASE,
+        scope: BASE,
         lang: 'he',
         dir: 'rtl',
         icons: [
@@ -26,7 +30,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,mp3}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
