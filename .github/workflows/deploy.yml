@@ -28,14 +28,11 @@ jobs:
 
       - name: Deploy to gh-pages
         run: |
+          cd dist
+          touch .nojekyll
+          git init -b gh-pages
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          cp -r dist /tmp/dist-deploy
-          git fetch origin gh-pages 2>/dev/null || true
-          git checkout gh-pages 2>/dev/null || git checkout --orphan gh-pages
-          git rm -rf . --quiet 2>/dev/null || true
-          cp -r /tmp/dist-deploy/. .
-          touch .nojekyll
           git add -A
-          git commit -m "Deploy from ${{ github.sha }}" --allow-empty
-          git push "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages --force
+          git commit -m "Deploy"
+          git push --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages
