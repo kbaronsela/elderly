@@ -45,6 +45,7 @@ interface AppState {
   linkToElderly: (elderlyUsername: string) => Promise<boolean>
   unlinkFamilyUser: (familyUserId: string) => Promise<void>
   updateElderlyAvatar: (elderlyId: string, avatar: string) => Promise<void>
+  refreshLinkedFamilyUsers: () => Promise<void>
 
   // Medications
   addMedication: (med: Omit<Medication, 'id'>) => Promise<void>
@@ -138,9 +139,16 @@ export const useStore = create<AppState>((set, get) => ({
 
     if (profile.role === 'elderly') {
       const { data: links } = await supabase.from('family_links').select('family_user_id').eq('elderly_user_id', profile.id)
-      const user = await buildUserFromProfile(profile, [], (links ?? []).map((l: { family_user_id: string }) => l.family_user_id))
+      const familyIds = (links ?? []).map((l: { family_user_id: string }) => l.family_user_id)
+      const user = await buildUserFromProfile(profile, [], familyIds)
       const data = await loadElderlyData(profile.id)
-      set({ currentUser: user, userData: { [user.id]: data }, screen: 'dashboard' })
+      // Load family user profiles so they appear in allUsers
+      const familyProfiles = await Promise.all(familyIds.map(async (fid: string) => {
+        const { data: fp } = await supabase.from('profiles').select('*').eq('id', fid).single()
+        return fp ? buildUserFromProfile(fp) : null
+      }))
+      const allUsers = [user, ...familyProfiles.filter(Boolean) as Awaited<ReturnType<typeof buildUserFromProfile>>[]]
+      set({ currentUser: user, allUsers, userData: { [user.id]: data }, screen: 'dashboard' })
     } else {
       const { data: links } = await supabase.from('family_links').select('elderly_user_id').eq('family_user_id', profile.id)
       const elderlyIds = (links ?? []).map((l: { elderly_user_id: string }) => l.elderly_user_id)
@@ -297,6 +305,24 @@ export const useStore = create<AppState>((set, get) => ({
       .eq('family_user_id', familyUserId).eq('elderly_user_id', currentUser.id)
     const updated = { ...currentUser, linkedFamilyUserIds: (currentUser.linkedFamilyUserIds ?? []).filter(id => id !== familyUserId) }
     set({ currentUser: updated })
+  },
+
+  // ── refreshLinkedFamilyUsers ───────────────────────────────────────────────
+  refreshLinkedFamilyUsers: async () => {
+    const { currentUser } = get()
+    if (!currentUser || currentUser.role !== 'elderly') return
+    const { data: links } = await supabase.from('family_links').select('family_user_id').eq('elderly_user_id', currentUser.id)
+    const familyIds = (links ?? []).map((l: { family_user_id: string }) => l.family_user_id)
+    const familyProfiles = await Promise.all(familyIds.map(async (fid: string) => {
+      const { data: fp } = await supabase.from('profiles').select('*').eq('id', fid).single()
+      return fp ? buildUserFromProfile(fp) : null
+    }))
+    const resolvedProfiles = (await Promise.all(familyProfiles)).filter(Boolean) as User[]
+    const updatedUser = { ...currentUser, linkedFamilyUserIds: familyIds }
+    set(s => ({
+      currentUser: updatedUser,
+      allUsers: [updatedUser, ...resolvedProfiles, ...s.allUsers.filter(u => u.id !== currentUser.id && !familyIds.includes(u.id))],
+    }))
   },
 
   // ── Medications ────────────────────────────────────────────────────────────

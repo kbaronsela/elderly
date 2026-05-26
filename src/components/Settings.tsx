@@ -1,11 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 
 export default function Settings() {
-  const { currentUser, allUsers, updateUser, unlinkFamilyUser, logout, setScreen } = useStore()
+  const { currentUser, allUsers, updateUser, unlinkFamilyUser, refreshLinkedFamilyUsers, logout, setScreen } = useStore()
   const [name, setName] = useState(currentUser?.name ?? '')
   const [wakeTime, setWakeTime] = useState(currentUser?.wakeUpTime ?? '07:00')
   const [saved, setSaved] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    refreshLinkedFamilyUsers()
+  }, [])
 
   if (!currentUser || currentUser.role !== 'elderly') return null
 
@@ -13,6 +18,12 @@ export default function Settings() {
     updateUser({ name: name.trim(), wakeUpTime: wakeTime })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true)
+    await refreshLinkedFamilyUsers()
+    setRefreshing(false)
   }
 
   // Linked family app-users
@@ -59,7 +70,16 @@ export default function Settings() {
 
       {/* Linked family app-users */}
       <div className="bg-white rounded-3xl shadow p-6 mb-5">
-        <h2 className="text-2xl font-bold text-gray-700 mb-3">📱 בני משפחה מחוברים לאפליקציה</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-2xl font-bold text-gray-700">📱 בני משפחה מחוברים</h2>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="text-blue-500 font-bold text-base px-3 py-1 rounded-xl hover:bg-blue-50 disabled:opacity-50"
+          >
+            {refreshing ? '⏳' : '🔄 רענן'}
+          </button>
+        </div>
         {linkedFamilyUsers.length === 0 ? (
           <p className="text-lg text-gray-400">אין עדיין בני משפחה מחוברים</p>
         ) : (
