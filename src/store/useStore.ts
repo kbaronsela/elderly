@@ -44,6 +44,7 @@ interface AppState {
   // Linking
   linkToElderly: (elderlyUsername: string) => Promise<boolean>
   unlinkFamilyUser: (familyUserId: string) => Promise<void>
+  unlinkFromElderly: (elderlyId: string) => Promise<void>
   updateElderlyAvatar: (elderlyId: string, avatar: string) => Promise<void>
   refreshLinkedFamilyUsers: () => Promise<void>
 
@@ -298,7 +299,7 @@ export const useStore = create<AppState>((set, get) => ({
     }))
   },
 
-  // ── unlinkFamilyUser ───────────────────────────────────────────────────────
+  // ── unlinkFamilyUser (elderly removes a family user) ──────────────────────
   unlinkFamilyUser: async (familyUserId) => {
     const { currentUser } = get()
     if (!currentUser || currentUser.role !== 'elderly') return
@@ -306,6 +307,21 @@ export const useStore = create<AppState>((set, get) => ({
       .eq('family_user_id', familyUserId).eq('elderly_user_id', currentUser.id)
     const updated = { ...currentUser, linkedFamilyUserIds: (currentUser.linkedFamilyUserIds ?? []).filter(id => id !== familyUserId) }
     set({ currentUser: updated })
+  },
+
+  // ── unlinkFromElderly (family user removes themselves) ────────────────────
+  unlinkFromElderly: async (elderlyId) => {
+    const { currentUser } = get()
+    if (!currentUser || currentUser.role !== 'family') return
+    await supabase.from('family_links').delete()
+      .eq('family_user_id', currentUser.id).eq('elderly_user_id', elderlyId)
+    const updatedIds = (currentUser.linkedElderlyIds ?? []).filter(id => id !== elderlyId)
+    const updatedUser = { ...currentUser, linkedElderlyIds: updatedIds }
+    set(s => ({
+      currentUser: updatedUser,
+      allUsers: s.allUsers.filter(u => u.id !== elderlyId),
+      userData: Object.fromEntries(Object.entries(s.userData).filter(([k]) => k !== elderlyId)),
+    }))
   },
 
   // ── refreshLinkedFamilyUsers ───────────────────────────────────────────────

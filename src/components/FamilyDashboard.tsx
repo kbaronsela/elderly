@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase'
 import type { User } from '../types'
 
 export default function FamilyDashboard() {
-  const { currentUser, getLinkedElderlyUsers, getElderlyData, linkToElderly, updateUser, setScreen, setViewingElderlyId, logout } = useStore()
+  const { currentUser, getLinkedElderlyUsers, getElderlyData, linkToElderly, updateUser, unlinkFromElderly, setScreen, setViewingElderlyId, logout } = useStore()
+  const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
   const [linkUsername, setLinkUsername] = useState('')
   const [linkError, setLinkError] = useState('')
   const [linkSuccess, setLinkSuccess] = useState('')
@@ -193,11 +194,25 @@ export default function FamilyDashboard() {
             .sort((a, b) => (b.takenAt ?? '').localeCompare(a.takenAt ?? ''))[0]
 
           return (
-            <div
-              key={elderly.id}
-              onClick={() => openElderly(elderly)}
-              className="bg-white rounded-3xl shadow-lg p-5 cursor-pointer hover:shadow-xl transition-all active:scale-98 border-2 border-transparent hover:border-green-200"
-            >
+            <div key={elderly.id} className="bg-white rounded-3xl shadow-lg overflow-hidden border-2 border-transparent">
+
+              {/* Unlink confirm bar */}
+              {confirmUnlink === elderly.id && (
+                <div className="bg-red-50 border-b border-red-200 p-4 flex items-center justify-between">
+                  <p className="text-lg text-red-700 font-bold">להתנתק מ-{elderly.name}?</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => { unlinkFromElderly(elderly.id); setConfirmUnlink(null) }}
+                      className="bg-red-600 text-white font-bold px-4 py-2 rounded-xl text-base">כן, נתק</button>
+                    <button onClick={() => setConfirmUnlink(null)}
+                      className="bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-base">ביטול</button>
+                  </div>
+                </div>
+              )}
+
+              <div
+                onClick={() => openElderly(elderly)}
+                className="p-5 cursor-pointer hover:shadow-xl transition-all active:scale-98"
+              >
               {/* Name & status badge */}
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -244,6 +259,15 @@ export default function FamilyDashboard() {
                   </p>
                 </div>
               )}
+              </div>
+
+              {/* Unlink button */}
+              <button
+                onClick={e => { e.stopPropagation(); setConfirmUnlink(elderly.id) }}
+                className="w-full text-center text-sm text-red-400 hover:text-red-600 py-2 border-t border-gray-100 font-medium"
+              >
+                🔗 התנתק מ-{elderly.name}
+              </button>
             </div>
           )
         })}
