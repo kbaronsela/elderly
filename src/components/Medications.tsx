@@ -18,6 +18,7 @@ export default function Medications() {
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<Omit<Medication, 'id'>>(emptyMed)
   const [showForm, setShowForm] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
   if (!currentUser || currentUser.role !== 'elderly') return null
   const { medications } = getElderlyData(currentUser.id)
@@ -86,10 +87,26 @@ export default function Medications() {
                 ))
               }
             </div>
-            <div className="flex gap-3">
-              <button onClick={() => openEdit(med)} className="flex-1 bg-blue-50 text-blue-700 font-bold text-xl py-3 rounded-xl hover:bg-blue-100">✏️ ערוך</button>
-              <button onClick={() => deleteMedication(med.id)} className="flex-1 bg-red-50 text-red-600 font-bold text-xl py-3 rounded-xl hover:bg-red-100">🗑️ מחק</button>
-            </div>
+            {confirmDelete === med.id ? (
+              <div className="bg-red-50 rounded-2xl p-3">
+                <p className="text-lg font-bold text-red-700 mb-3 text-center">למחוק את "{med.name}"?</p>
+                <div className="flex gap-2">
+                  <button onClick={() => { deleteMedication(med.id); setConfirmDelete(null) }}
+                    className="flex-1 bg-red-600 text-white font-bold text-lg py-2 rounded-xl hover:bg-red-700">
+                    כן, מחק
+                  </button>
+                  <button onClick={() => setConfirmDelete(null)}
+                    className="flex-1 bg-gray-200 text-gray-700 font-bold text-lg py-2 rounded-xl hover:bg-gray-300">
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <button onClick={() => openEdit(med)} className="flex-1 bg-blue-50 text-blue-700 font-bold text-xl py-3 rounded-xl hover:bg-blue-100">✏️ ערוך</button>
+                <button onClick={() => setConfirmDelete(med.id)} className="flex-1 bg-red-50 text-red-600 font-bold text-xl py-3 rounded-xl hover:bg-red-100">🗑️ מחק</button>
+              </div>
+            )}
           </div>
         ))}
       </div>
