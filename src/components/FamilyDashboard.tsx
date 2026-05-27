@@ -191,7 +191,7 @@ export default function FamilyDashboard() {
             <input
               type="text"
               value={linkUsername}
-              onChange={e => setLinkUsername(e.target.value)}
+              onChange={e => setLinkUsername(e.target.value.toLowerCase())}
               onKeyDown={e => e.key === 'Enter' && handleLink()}
               placeholder="שם משתמש של הקשיש"
               className="w-full border-2 border-green-200 rounded-xl p-3 text-xl focus:border-green-500 outline-none mb-3"
