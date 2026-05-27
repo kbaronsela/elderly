@@ -21,18 +21,20 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
     if (permission !== 'granted') return false
 
     const reg = await navigator.serviceWorker.ready
+
+    // Reuse existing subscription if it exists – avoids FCM re-registration delay
     let sub = await reg.pushManager.getSubscription()
 
-    // Always resubscribe to ensure fresh subscription with correct VAPID key
-    if (sub) await sub.unsubscribe()
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    } as PushSubscriptionOptionsInit)
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      } as PushSubscriptionOptionsInit)
+    }
 
     const subJson = sub.toJSON()
 
-    // Delete any old subscriptions for this user, then insert fresh
+    // Save to Supabase (delete old entries for this user first)
     await supabase.from('push_subscriptions').delete().eq('user_id', userId)
     const { error } = await supabase.from('push_subscriptions').insert({
       user_id: userId,
@@ -44,7 +46,7 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
       return false
     }
 
-    console.log('Push subscription saved successfully')
+    console.log('Push subscription saved, endpoint prefix:', sub.endpoint.slice(0, 60))
     return true
   } catch (err) {
     console.warn('Push subscription failed:', err)
