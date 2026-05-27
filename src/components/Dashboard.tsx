@@ -5,7 +5,7 @@ import { fetchIsraeliHolidays, getTodayHoliday, getUpcomingHolidays } from '../u
 import type { IsraeliHoliday } from '../utils/holidays'
 
 export default function Dashboard() {
-  const { currentUser, getElderlyData, setScreen } = useStore()
+  const { currentUser, getElderlyData } = useStore()
   const [now, setNow] = useState(new Date())
   const [holidays, setHolidays] = useState<IsraeliHoliday[]>([])
 
