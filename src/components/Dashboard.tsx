@@ -47,7 +47,7 @@ export default function Dashboard() {
       {/* Today's Israeli holiday */}
       {todayHoliday && (
         <div className="bg-blue-600 rounded-3xl p-5 mb-5 text-white text-center shadow-lg">
-          <p className="text-4xl mb-1">🇮🇱</p>
+          <p className="text-4xl mb-1">✡️</p>
           <p className="text-2xl font-black">{todayHoliday.hebrew}</p>
           <p className="text-lg opacity-80">חג שמח!</p>
         </div>
@@ -63,7 +63,7 @@ export default function Dashboard() {
               const days = Math.round((d.getTime() - Date.now()) / 86400000)
               return (
                 <div key={h.date} className="flex justify-between items-center text-lg text-indigo-700">
-                  <span>🇮🇱 {h.hebrew}</span>
+                  <span>{h.hebrew}</span>
                   <span className="text-sm text-indigo-400">בעוד {days} ימים</span>
                 </div>
               )

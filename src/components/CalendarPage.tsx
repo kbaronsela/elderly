@@ -185,7 +185,7 @@ export default function CalendarPage() {
             onClick={() => setShowHolidays(v => !v)}
             className="w-full flex items-center justify-between p-5 text-right"
           >
-            <span className="text-xl font-bold text-indigo-700">🇮🇱 חגים ישראליים קרובים</span>
+            <span className="text-xl font-bold text-indigo-700">✡️ חגים ישראליים קרובים</span>
             <span className="text-2xl text-gray-400">{showHolidays ? '▲' : '▼'}</span>
           </button>
 
@@ -197,7 +197,6 @@ export default function CalendarPage() {
                 return (
                   <div key={h.date + h.title} className={`flex items-center justify-between rounded-2xl px-4 py-2 ${isToday ? 'bg-blue-100 ring-2 ring-blue-400' : 'bg-gray-50'}`}>
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">🇮🇱</span>
                       <span className={`text-lg ${isToday ? 'font-black text-blue-800' : 'text-gray-800'}`}>{h.hebrew}</span>
                       {isToday && <span className="text-blue-600 text-sm font-bold">היום!</span>}
                     </div>
