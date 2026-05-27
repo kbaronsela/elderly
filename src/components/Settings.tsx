@@ -7,6 +7,8 @@ export default function Settings() {
   const [wakeTime, setWakeTime] = useState(currentUser?.wakeUpTime ?? '07:00')
   const [saved, setSaved] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
+  const [unlinking, setUnlinking] = useState(false)
 
   useEffect(() => {
     refreshLinkedFamilyUsers()
@@ -24,6 +26,25 @@ export default function Settings() {
     setRefreshing(true)
     await refreshLinkedFamilyUsers()
     setRefreshing(false)
+  }
+
+  async function handleUnlink(familyUserId: string) {
+    setUnlinking(true)
+    await unlinkFamilyUser(familyUserId)
+    // Send push notification to the unlinked family member
+    try {
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_user_id: familyUserId,
+          title: '🔗 ניתוק מהאפליקציה',
+          body: `${currentUser!.name} ניתק אותך מהאפליקציה`,
+        }),
+      })
+    } catch { /* push is best-effort */ }
+    setUnlinking(false)
+    setConfirmUnlink(null)
   }
 
   // Linked family app-users
@@ -85,17 +106,40 @@ export default function Settings() {
         ) : (
           <div className="space-y-3">
             {linkedFamilyUsers.map(u => (
-              <div key={u.id} className="flex items-center justify-between bg-green-50 rounded-2xl p-4">
-                <div>
-                  <p className="text-xl font-bold text-green-800">{u.name}</p>
-                  <p className="text-base text-green-600" dir="ltr">{u.username}</p>
-                </div>
-                <button
-                  onClick={() => unlinkFamilyUser(u.id)}
-                  className="text-red-400 hover:text-red-600 text-base font-bold px-3 py-2"
-                >
-                  ✕ נתק
-                </button>
+              <div key={u.id} className="bg-green-50 rounded-2xl overflow-hidden">
+                {confirmUnlink === u.id ? (
+                  <div className="p-4">
+                    <p className="text-lg font-bold text-red-700 mb-3">לנתק את {u.name}?<br/><span className="text-sm font-normal text-red-500">תישלח לו/ה הודעה על הניתוק</span></p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleUnlink(u.id)}
+                        disabled={unlinking}
+                        className="flex-1 bg-red-600 text-white font-bold py-2 rounded-xl text-base hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {unlinking ? '⏳...' : 'כן, נתק'}
+                      </button>
+                      <button
+                        onClick={() => setConfirmUnlink(null)}
+                        className="flex-1 bg-gray-200 text-gray-700 font-bold py-2 rounded-xl text-base hover:bg-gray-300"
+                      >
+                        ביטול
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between p-4">
+                    <div>
+                      <p className="text-xl font-bold text-green-800">{u.name}</p>
+                      <p className="text-base text-green-600" dir="ltr">{u.username}</p>
+                    </div>
+                    <button
+                      onClick={() => setConfirmUnlink(u.id)}
+                      className="text-red-400 hover:text-red-600 text-base font-bold px-3 py-2"
+                    >
+                      ✕ נתק
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
