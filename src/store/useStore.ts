@@ -65,6 +65,8 @@ interface AppState {
 
   // Calendar
   addCalendarEvent: (event: Omit<CalendarEvent, 'id'>) => Promise<void>
+  updateCalendarEvent: (id: string, updates: Partial<CalendarEvent>) => Promise<void>
+  deleteCalendarEvent: (id: string) => Promise<void>
   setCalendarEvents: (events: CalendarEvent[]) => void
 
   // Selectors
@@ -440,6 +442,22 @@ export const useStore = create<AppState>((set, get) => ({
     const bucket = userData[currentUser.id] ?? emptyUserData()
     set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: [...bucket.calendarEvents, newEvent] } } }))
     await supabase.from('calendar_events').insert({ id: newEvent.id, elderly_user_id: currentUser.id, title: event.title, date: event.date, time: event.time ?? '', is_holiday: event.isHoliday ?? false, is_birthday: event.isBirthday ?? false })
+  },
+
+  updateCalendarEvent: async (id, updates) => {
+    const { currentUser, userData } = get()
+    if (!currentUser) return
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: bucket.calendarEvents.map(e => e.id === id ? { ...e, ...updates } : e) } } }))
+    await supabase.from('calendar_events').update({ title: updates.title, date: updates.date, time: updates.time ?? '', is_holiday: updates.isHoliday ?? false, is_birthday: updates.isBirthday ?? false }).eq('id', id)
+  },
+
+  deleteCalendarEvent: async (id) => {
+    const { currentUser, userData } = get()
+    if (!currentUser) return
+    const bucket = userData[currentUser.id] ?? emptyUserData()
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: bucket.calendarEvents.filter(e => e.id !== id) } } }))
+    await supabase.from('calendar_events').delete().eq('id', id)
   },
 
   setCalendarEvents: (events) => {
