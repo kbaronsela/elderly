@@ -100,7 +100,7 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
     event.waitUntil(
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
         if (clients.length > 0) return clients[0].focus()
-        return self.clients.openWindow('/')
+        return self.clients.openWindow(self.registration.scope)
       })
     )
     return
@@ -121,7 +121,7 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
           client.postMessage({ type: 'NOTIFICATION_TAKEN', tag })
         }
       } else {
-        self.clients.openWindow('/')
+        self.clients.openWindow(self.registration.scope)
       }
     })
   )
