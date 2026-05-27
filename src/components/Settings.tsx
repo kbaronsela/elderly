@@ -39,7 +39,7 @@ export default function Settings() {
           body: JSON.stringify({
             target_user_id: familyUserId,
             title: '🔗 ניתוק ממעקב',
-            body: `${currentUser!.name} ניתק אותך ממעקב אחריו/ה באפליקציה`,
+            body: `${currentUser!.name} ניתק/ה אותך ממעקב אחריו/ה באפליקציה`,
           }),
       })
     } catch { /* push is best-effort */ }
