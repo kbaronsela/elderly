@@ -10,6 +10,7 @@ export default function FamilyMembers() {
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState<Omit<FamilyMember, 'id'>>(emptyMember)
+  const [formError, setFormError] = useState('')
 
   // Refresh contacts from Supabase every time this screen opens
   useEffect(() => {
@@ -19,13 +20,13 @@ export default function FamilyMembers() {
   if (!currentUser || currentUser.role !== 'elderly') return null
   const { familyMembers } = getElderlyData(currentUser.id)
 
-  function openNew() { setForm(emptyMember); setEditing(null); setShowForm(true) }
+  function openNew() { setForm(emptyMember); setEditing(null); setFormError(''); setShowForm(true) }
   function openEdit(m: FamilyMember) {
     setForm({ name: m.name, relation: m.relation, phone: m.phone, email: m.email ?? '', appUserId: m.appUserId ?? '' })
-    setEditing(m.id); setShowForm(true)
+    setEditing(m.id); setFormError(''); setShowForm(true)
   }
   function save() {
-    if (!form.name.trim() || !form.phone.trim()) return
+    if (!form.name.trim()) { setFormError('יש להזין שם מלא'); return }
     if (editing) updateFamilyMember(editing, form)
     else addFamilyMember(form)
     setShowForm(false)
@@ -79,7 +80,7 @@ export default function FamilyMembers() {
                 )}
               </div>
               <div className="space-y-1 text-xl text-gray-600 mb-4">
-                <p>📞 {m.phone}</p>
+                {m.phone ? <p>📞 {m.phone}</p> : <p className="text-gray-400 text-base">📞 טלפון לא הוזן</p>}
                 {m.email && <p>📧 {m.email}</p>}
                 {appUser && <p className="text-green-600 text-base">👤 חשבון: {appUser.username}</p>}
               </div>
@@ -97,8 +98,14 @@ export default function FamilyMembers() {
           <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-black text-green-800 mb-5">{editing ? 'עריכה' : 'איש קשר חדש'}</h2>
 
+            {formError && (
+              <div className="bg-red-50 border-2 border-red-200 text-red-700 rounded-xl p-3 mb-4 text-lg font-semibold">
+                ⚠️ {formError}
+              </div>
+            )}
+
             <label className="block text-xl font-semibold text-gray-700 mb-1">שם מלא *</label>
-            <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+            <input type="text" value={form.name} onChange={e => { setForm(f => ({ ...f, name: e.target.value })); setFormError('') }}
               placeholder="שם מלא"
               className="w-full border-2 border-green-200 rounded-xl p-4 text-xl mb-4 focus:border-green-500 outline-none" />
 
@@ -108,11 +115,11 @@ export default function FamilyMembers() {
               {RELATIONS.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
 
-            <label className="block text-xl font-semibold text-gray-700 mb-1">טלפון (WhatsApp) *</label>
+            <label className="block text-xl font-semibold text-gray-700 mb-1">טלפון (WhatsApp)</label>
             <input type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
               placeholder="+972501234567"
               className="w-full border-2 border-green-200 rounded-xl p-4 text-xl mb-1 focus:border-green-500 outline-none" dir="ltr" />
-            <p className="text-gray-400 text-base mb-4">כולל קידומת מדינה, למשל: +972501234567</p>
+            <p className="text-gray-400 text-base mb-4">כולל קידומת מדינה, למשל: +972501234567 (אופציונלי)</p>
 
             <label className="block text-xl font-semibold text-gray-700 mb-1">דוא"ל (אופציונלי)</label>
             <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
