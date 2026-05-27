@@ -15,7 +15,6 @@ export default function FamilyDashboard() {
   const [showLinkForm, setShowLinkForm] = useState(false)
   const [showPhoneEdit, setShowPhoneEdit] = useState(false)
   const [phoneInput, setPhoneInput] = useState(currentUser?.phone ?? '')
-  const [phoneSaved, setPhoneSaved] = useState(false)
 
   // Subscribe to push notifications automatically on first load
   useEffect(() => {
@@ -38,8 +37,7 @@ export default function FamilyDashboard() {
 
   async function savePhone() {
     await updateUser({ phone: phoneInput.trim() })
-    setPhoneSaved(true)
-    setTimeout(() => { setPhoneSaved(false); setShowPhoneEdit(false) }, 1500)
+    setShowPhoneEdit(false)
   }
 
   // ── Supabase Realtime: get notified when linked elderly takes medication ────
@@ -133,20 +131,25 @@ export default function FamilyDashboard() {
             <span className="text-green-600 font-bold text-sm">{currentUser.phone ? '✏️ ערוך' : '➕ הוסף'}</span>
           </button>
         ) : (
-          <div className="flex gap-2 items-center mt-1">
+          <div className="mt-2">
             <input
               type="tel"
               value={phoneInput}
               onChange={e => setPhoneInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') savePhone(); if (e.key === 'Escape') setShowPhoneEdit(false) }}
               placeholder="050-0000000"
-              className="flex-1 border-2 border-green-300 rounded-xl p-2 text-lg focus:border-green-500 outline-none"
+              className="w-full border-2 border-green-300 rounded-xl p-3 text-lg focus:border-green-500 outline-none mb-2"
               dir="ltr"
               autoFocus
             />
-            <button onClick={savePhone} className="bg-green-600 text-white font-bold px-4 py-2 rounded-xl text-lg hover:bg-green-700">
-              {phoneSaved ? '✅' : 'שמור'}
-            </button>
-            <button onClick={() => setShowPhoneEdit(false)} className="text-gray-400 text-2xl px-1">✕</button>
+            <div className="flex gap-2">
+              <button onClick={savePhone} className="flex-1 bg-green-600 text-white font-bold py-2 rounded-xl text-lg hover:bg-green-700">
+                שמור
+              </button>
+              <button onClick={() => setShowPhoneEdit(false)} className="flex-1 bg-gray-100 text-gray-600 font-bold py-2 rounded-xl text-lg hover:bg-gray-200">
+                ביטול
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -185,20 +188,18 @@ export default function FamilyDashboard() {
         {showLinkForm && (
           <div className="mt-3">
             <p className="text-lg text-gray-500 mb-3">הכנס את שם המשתמש של הקשיש באפליקציה:</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={linkUsername}
-                onChange={e => setLinkUsername(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleLink()}
-                placeholder="שם משתמש של הקשיש"
-                className="flex-1 border-2 border-green-200 rounded-xl p-3 text-xl focus:border-green-500 outline-none"
-                dir="ltr"
-              />
-              <button onClick={handleLink} className="bg-green-600 text-white font-bold text-xl px-5 rounded-xl hover:bg-green-700 active:scale-95">
-                חיבור
-              </button>
-            </div>
+            <input
+              type="text"
+              value={linkUsername}
+              onChange={e => setLinkUsername(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleLink()}
+              placeholder="שם משתמש של הקשיש"
+              className="w-full border-2 border-green-200 rounded-xl p-3 text-xl focus:border-green-500 outline-none mb-3"
+              dir="ltr"
+            />
+            <button onClick={handleLink} className="w-full bg-green-600 text-white font-bold text-xl py-3 rounded-xl hover:bg-green-700 active:scale-95">
+              🔗 חיבור
+            </button>
             {linkError && <p className="text-red-500 text-lg mt-2">⚠️ {linkError}</p>}
             {linkSuccess && <p className="text-green-600 text-lg mt-2 font-bold">{linkSuccess}</p>}
           </div>

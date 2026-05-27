@@ -95,17 +95,20 @@ export default function Medications() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center">
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center"
+          onKeyDown={e => { if (e.key === 'Escape') setShowForm(false) }}>
           <div className="bg-white rounded-t-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-black text-blue-800 mb-5">{editing ? 'עריכת תרופה' : 'תרופה חדשה'}</h2>
 
             <label className="block text-xl font-semibold text-gray-700 mb-1">שם התרופה *</label>
             <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              placeholder="למשל: אמלודיפין"
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setShowForm(false) }}
+              placeholder="למשל: אמלודיפין" autoFocus
               className="w-full border-2 border-blue-200 rounded-xl p-4 text-xl mb-4 focus:border-blue-500 outline-none" />
 
             <label className="block text-xl font-semibold text-gray-700 mb-1">הערות</label>
             <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              onKeyDown={e => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setShowForm(false) }}
               placeholder="למשל: עם אוכל"
               className="w-full border-2 border-blue-200 rounded-xl p-4 text-xl mb-4 focus:border-blue-500 outline-none" />
 
