@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { formatDateHe } from '../utils/dateHe'
 import { supabase } from '../lib/supabase'
+import { subscribeToPush } from '../utils/pushSubscription'
 import type { User } from '../types'
 
 export default function FamilyDashboard() {
   const { currentUser, getLinkedElderlyUsers, getElderlyData, linkToElderly, updateUser, unlinkFromElderly, setScreen, setViewingElderlyId, logout } = useStore()
   const [confirmUnlink, setConfirmUnlink] = useState<string | null>(null)
+  const [pushStatus, setPushStatus] = useState<'idle' | 'subscribed' | 'denied'>('idle')
   const [linkUsername, setLinkUsername] = useState('')
   const [linkError, setLinkError] = useState('')
   const [linkSuccess, setLinkSuccess] = useState('')
@@ -14,6 +16,25 @@ export default function FamilyDashboard() {
   const [showPhoneEdit, setShowPhoneEdit] = useState(false)
   const [phoneInput, setPhoneInput] = useState(currentUser?.phone ?? '')
   const [phoneSaved, setPhoneSaved] = useState(false)
+
+  // Subscribe to push notifications automatically on first load
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'family') return
+    if (Notification.permission === 'granted') {
+      setPushStatus('subscribed')
+      subscribeToPush(currentUser.id)
+      return
+    }
+    if (Notification.permission === 'denied') {
+      setPushStatus('denied')
+    }
+  }, [currentUser?.id])
+
+  async function enablePush() {
+    if (!currentUser) return
+    const ok = await subscribeToPush(currentUser.id)
+    setPushStatus(ok ? 'subscribed' : 'denied')
+  }
 
   async function savePhone() {
     await updateUser({ phone: phoneInput.trim() })
@@ -129,6 +150,29 @@ export default function FamilyDashboard() {
           </div>
         )}
       </div>
+
+      {/* Push notification banner */}
+      {pushStatus === 'idle' && Notification.permission === 'default' && (
+        <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-4 mb-5 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-lg font-bold text-blue-800">🔔 קבל התראות כשהקשיש לוקח תרופה</p>
+            <p className="text-base text-blue-600">גם כשהאפליקציה סגורה</p>
+          </div>
+          <button onClick={enablePush} className="bg-blue-600 text-white font-bold px-4 py-2 rounded-2xl text-base whitespace-nowrap hover:bg-blue-700">
+            הפעל
+          </button>
+        </div>
+      )}
+      {pushStatus === 'subscribed' && (
+        <div className="bg-green-50 border-2 border-green-200 rounded-3xl p-3 mb-5 text-center text-green-700 font-semibold text-base">
+          🔔 התראות פעילות – תקבל עדכון כשהקשיש לוקח תרופה
+        </div>
+      )}
+      {pushStatus === 'denied' && (
+        <div className="bg-orange-50 border-2 border-orange-200 rounded-3xl p-3 mb-5 text-center text-orange-700 font-semibold text-base">
+          🔕 התראות חסומות – הפעל בהגדרות הדפדפן
+        </div>
+      )}
 
       {/* Link to elderly */}
       <div className="bg-white rounded-3xl shadow p-5 mb-5">

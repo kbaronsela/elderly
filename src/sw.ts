@@ -93,16 +93,25 @@ self.addEventListener('message', (event: ExtendableMessageEvent) => {
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close()
   const tag = event.notification.tag
+  const notifData = event.notification.data ?? {}
 
-  if (event.action === 'snooze') {
-    // Snooze: re-fire in 10 minutes by removing the key so it can re-trigger
-    setTimeout(() => {
-      firedKeys.delete(tag)
-    }, 10 * 60 * 1000)
+  // Server-side push (family member notification) – just open the app
+  if (notifData.type === 'med-taken') {
+    event.waitUntil(
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+        if (clients.length > 0) return clients[0].focus()
+        return self.clients.openWindow('/')
+      })
+    )
     return
   }
 
-  // Open or focus the app
+  // Local medication alarm actions
+  if (event.action === 'snooze') {
+    setTimeout(() => { firedKeys.delete(tag) }, 10 * 60 * 1000)
+    return
+  }
+
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
       if (clients.length > 0) {
@@ -118,18 +127,21 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
   )
 })
 
-// ── Push (future server-side push) ───────────────────────────────────────────
+// ── Push (server-side push from Edge Function) ───────────────────────────────
 
 self.addEventListener('push', (event: PushEvent) => {
   const data = event.data?.json?.() ?? {}
   event.waitUntil(
-    self.registration.showNotification(data.title ?? '⏰ זמן לתרופות!', {
+    self.registration.showNotification(data.title ?? '⏰ עדכון תרופות', {
       body: data.body ?? '',
-      icon: '/icons/icon-192.png',
-      requireInteraction: true,
+      icon: data.icon ?? '/icons/icon-192.png',
+      badge: data.badge ?? '/icons/icon-192.png',
+      requireInteraction: false,
       tag: data.tag ?? 'push',
+      data: data.data ?? {},
       // @ts-ignore
-      vibrate: [400, 150, 400],
+      vibrate: [300, 100, 300],
     })
   )
 })
+

@@ -64,6 +64,15 @@ create table if not exists calendar_events (
   is_birthday boolean default false
 );
 
+-- Push notification subscriptions (per family user device)
+create table if not exists push_subscriptions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references profiles(id) on delete cascade not null,
+  subscription jsonb not null,
+  created_at timestamptz default now(),
+  unique (user_id, (subscription->>'endpoint'))
+);
+
 -- ============================================================
 -- Row Level Security
 -- ============================================================
@@ -74,6 +83,7 @@ alter table medication_logs enable row level security;
 alter table family_members enable row level security;
 alter table family_links enable row level security;
 alter table calendar_events enable row level security;
+alter table push_subscriptions enable row level security;
 
 -- Helper: is the current user a family member linked to elderly_id?
 create or replace function is_linked_family(elderly_id uuid)
@@ -116,6 +126,10 @@ create policy "links_insert" on family_links for insert
   with check (family_user_id = auth.uid());
 create policy "links_delete" on family_links for delete
   using (family_user_id = auth.uid() or elderly_user_id = auth.uid());
+
+-- PUSH SUBSCRIPTIONS
+create policy "push_subs_own" on push_subscriptions for all
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- CALENDAR EVENTS
 create policy "cal_select" on calendar_events for select
