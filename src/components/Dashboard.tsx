@@ -115,24 +115,6 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Quick buttons */}
-      <div className="grid grid-cols-2 gap-4">
-        {[
-          { screen: 'medications' as const, icon: '💊', label: 'ניהול תרופות', color: 'purple' },
-          { screen: 'family' as const, icon: '👨‍👩‍👧', label: 'בני משפחה', color: 'green' },
-          { screen: 'calendar' as const, icon: '📅', label: 'לוח שנה', color: 'yellow' },
-          { screen: 'settings' as const, icon: '⚙️', label: 'הגדרות', color: 'gray' },
-        ].map(({ screen, icon, label, color }) => (
-          <button
-            key={screen}
-            onClick={() => setScreen(screen)}
-            className={`bg-${color}-100 hover:bg-${color}-200 rounded-3xl p-6 text-center transition-all active:scale-95`}
-          >
-            <div className="text-5xl mb-2">{icon}</div>
-            <div className={`text-xl font-bold text-${color}-700`}>{label}</div>
-          </button>
-        ))}
-      </div>
     </div>
   )
 }
