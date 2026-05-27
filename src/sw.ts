@@ -130,12 +130,10 @@ self.addEventListener('notificationclick', (event: NotificationEvent) => {
 // ── Push (server-side push from Edge Function) ───────────────────────────────
 
 self.addEventListener('push', (event: PushEvent) => {
-  const data = event.data?.json?.() ?? {}
+  const data = event.data?.json() ?? {}
   event.waitUntil(
     self.registration.showNotification(data.title ?? '⏰ עדכון תרופות', {
       body: data.body ?? '',
-      icon: data.icon ?? '/icons/icon-192.png',
-      badge: data.badge ?? '/icons/icon-192.png',
       requireInteraction: false,
       tag: data.tag ?? 'push',
       data: data.data ?? {},

@@ -72,8 +72,6 @@ Deno.serve(async (req) => {
       title: `✅ ${elderlyName} לקח/ה תרופות`,
       body: medicationNames.length > 0 ? `${medicationNames.join(', ')} – שעה ${timeStr}` : `שעה ${timeStr}`,
       tag: `med-taken-${elderlyUserId}-${Date.now()}`,
-      icon: '/icons/icon-192.png',
-      badge: '/icons/icon-192.png',
       data: { elderlyUserId, type: 'med-taken' },
     })
 
