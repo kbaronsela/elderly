@@ -12,7 +12,10 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export async function subscribeToPush(userId: string): Promise<boolean> {
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return false
-    if (!VAPID_PUBLIC_KEY) return false
+    if (!VAPID_PUBLIC_KEY) {
+      console.warn('VAPID_PUBLIC_KEY missing')
+      return false
+    }
 
     const permission = await Notification.requestPermission()
     if (permission !== 'granted') return false
@@ -20,26 +23,28 @@ export async function subscribeToPush(userId: string): Promise<boolean> {
     const reg = await navigator.serviceWorker.ready
     let sub = await reg.pushManager.getSubscription()
 
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-      } as PushSubscriptionOptionsInit)
-    }
+    // Always resubscribe to ensure fresh subscription with correct VAPID key
+    if (sub) await sub.unsubscribe()
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    } as PushSubscriptionOptionsInit)
 
     const subJson = sub.toJSON()
 
-    // Upsert subscription in Supabase
-    const { error } = await supabase.from('push_subscriptions').upsert({
+    // Delete any old subscriptions for this user, then insert fresh
+    await supabase.from('push_subscriptions').delete().eq('user_id', userId)
+    const { error } = await supabase.from('push_subscriptions').insert({
       user_id: userId,
       subscription: subJson,
-    }, { onConflict: 'user_id,subscription->endpoint' })
+    })
 
     if (error) {
-      // If unique constraint issue, try plain insert
-      await supabase.from('push_subscriptions').insert({ user_id: userId, subscription: subJson })
+      console.error('Failed to save push subscription:', error)
+      return false
     }
 
+    console.log('Push subscription saved successfully')
     return true
   } catch (err) {
     console.warn('Push subscription failed:', err)
@@ -52,10 +57,8 @@ export async function unsubscribeFromPush(userId: string): Promise<void> {
     const reg = await navigator.serviceWorker?.ready
     const sub = await reg?.pushManager.getSubscription()
     if (sub) {
-      const endpoint = sub.endpoint
       await sub.unsubscribe()
-      await supabase.from('push_subscriptions').delete()
-        .eq('user_id', userId).eq('subscription->>endpoint', endpoint)
+      await supabase.from('push_subscriptions').delete().eq('user_id', userId)
     }
   } catch (err) {
     console.warn('Unsubscribe failed:', err)
