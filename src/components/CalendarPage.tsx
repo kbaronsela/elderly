@@ -42,12 +42,12 @@ export default function CalendarPage() {
     const today = new Date().toISOString().slice(0, 10)
     calendarEvents.forEach(ev => {
       if (ev.date < today) {
-        if (ev.isBirthday) {
+          if (ev.isBirthday) {
           // Advance birthday to next year
           let newDate = nextYearDate(ev.date)
           // Keep advancing until it's in the future (in case very old date)
           while (newDate < today) newDate = nextYearDate(newDate)
-          updateCalendarEvent(ev.id, { date: newDate })
+          updateCalendarEvent(ev.id, { date: newDate, isBirthday: true, isHoliday: false })
         } else {
           deleteCalendarEvent(ev.id)
         }

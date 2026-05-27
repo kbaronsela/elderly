@@ -448,8 +448,11 @@ export const useStore = create<AppState>((set, get) => ({
     const { currentUser, userData } = get()
     if (!currentUser) return
     const bucket = userData[currentUser.id] ?? emptyUserData()
-    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: bucket.calendarEvents.map(e => e.id === id ? { ...e, ...updates } : e) } } }))
-    await supabase.from('calendar_events').update({ title: updates.title, date: updates.date, time: updates.time ?? '', is_holiday: updates.isHoliday ?? false, is_birthday: updates.isBirthday ?? false }).eq('id', id)
+    const existing = bucket.calendarEvents.find(e => e.id === id)
+    if (!existing) return
+    const merged = { ...existing, ...updates }
+    set(s => ({ userData: { ...s.userData, [currentUser.id]: { ...bucket, calendarEvents: bucket.calendarEvents.map(e => e.id === id ? merged : e) } } }))
+    await supabase.from('calendar_events').update({ title: merged.title, date: merged.date, time: merged.time ?? '', is_holiday: merged.isHoliday ?? false, is_birthday: merged.isBirthday ?? false }).eq('id', id)
   },
 
   deleteCalendarEvent: async (id) => {
