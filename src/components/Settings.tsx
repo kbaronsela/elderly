@@ -36,11 +36,11 @@ export default function Settings() {
       await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-push`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          target_user_id: familyUserId,
-          title: '🔗 ניתוק מהאפליקציה',
-          body: `${currentUser!.name} ניתק אותך מהאפליקציה`,
-        }),
+          body: JSON.stringify({
+            target_user_id: familyUserId,
+            title: '🔗 ניתוק ממעקב',
+            body: `${currentUser!.name} ניתק אותך ממעקב אחריו/ה באפליקציה`,
+          }),
       })
     } catch { /* push is best-effort */ }
     setUnlinking(false)
